@@ -13,22 +13,25 @@ class RateLimiter {
     constructor(apiKeys, config = {}) {
         this.apiKeys = apiKeys;
         this.currentKeyIndex = 0;
-        this.currentModel = 'gemini-2.5-flash'; // Start with best model
+
+        // Priority order for models
+        this.modelPriority = [
+            'gemini-3-flash-preview',
+            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash-lite',
+            'gemini-flash-lite-latest',
+            'gemini-2.5-flash'
+        ];
+
+        this.currentModel = this.modelPriority[0];
 
         // Model configurations
         this.models = {
-            'gemini-2.5-flash': {
-                rpm: 10,
-                tpm: 250000,
-                rpd: 250,
-                quality: 'high'
-            },
-            'gemini-2.5-flash-lite': {
-                rpm: 15,
-                tpm: 250000,
-                rpd: 1000,
-                quality: 'medium'
-            }
+            'gemini-3-flash-preview': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' },
+            'gemini-2.5-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
+            'gemini-2.0-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
+            'gemini-flash-lite-latest': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
+            'gemini-2.5-flash': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' }
         };
 
         // Safety buffer: use 80% of limits to avoid edge cases
@@ -37,22 +40,16 @@ class RateLimiter {
         // Track usage per key per model
         this.usage = {};
         apiKeys.forEach((_, keyIndex) => {
-            this.usage[keyIndex] = {
-                'gemini-2.5-flash': {
+            this.usage[keyIndex] = {};
+            Object.keys(this.models).forEach(model => {
+                this.usage[keyIndex][model] = {
                     requestCount: 0,
                     tokenCount: 0,
                     dailyCount: 0,
                     lastResetMinute: Date.now(),
                     lastResetDay: this.getMidnightPT()
-                },
-                'gemini-2.5-flash-lite': {
-                    requestCount: 0,
-                    tokenCount: 0,
-                    dailyCount: 0,
-                    lastResetMinute: Date.now(),
-                    lastResetDay: this.getMidnightPT()
-                }
-            };
+                };
+            });
         });
 
         // Request queue
@@ -120,9 +117,10 @@ class RateLimiter {
      * Find next available key and model
      */
     findAvailableKeyAndModel(estimatedTokens = 2000) {
-        const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+        // Use the priority order defined in constructor
+        const models = this.modelPriority;
 
-        // Try each model
+        // Try each model in priority order
         for (const model of models) {
             // Try each API key for this model
             for (let i = 0; i < this.apiKeys.length; i++) {
@@ -144,19 +142,24 @@ class RateLimiter {
         const usage = this.usage[keyIndex][model];
         const limits = this.models[model];
 
+        // If daily limit hit, wait until tomorrow (approximation)
+        if (usage.dailyCount >= Math.floor(limits.rpd * this.SAFETY_FACTOR)) {
+            const now = Date.now();
+            const tomorrow = this.getMidnightPT() + 24 * 60 * 60 * 1000;
+            return tomorrow - now;
+        }
+
         const timeSinceReset = Date.now() - usage.lastResetMinute;
         const timeUntilReset = 60000 - timeSinceReset;
 
         // If we've hit RPM limit, wait until window resets
-        if (usage.requestCount >= limits.rpm) {
+        if (usage.requestCount >= Math.floor(limits.rpm * this.SAFETY_FACTOR)) {
             return Math.max(timeUntilReset, 1000);
         }
 
-        // Otherwise, throttle to spread requests evenly
+        // Throttling to spread requests
         const safeRPM = Math.floor(limits.rpm * this.SAFETY_FACTOR);
-        const minInterval = 60000 / safeRPM;
-
-        return minInterval;
+        return 60000 / safeRPM;
     }
 
     /**
@@ -198,6 +201,11 @@ class RateLimiter {
                 }
             }
 
+            if (minWait > 30000) {
+                console.log('Maximum daily limits reached for all models across all keys.');
+                return null;
+            }
+
             console.log(`Rate limit reached. Waiting ${Math.ceil(minWait / 1000)}s before retry...`);
             await this.sleep(minWait);
 
@@ -221,27 +229,27 @@ class RateLimiter {
         const stats = {
             keys: [],
             totalRequests: 0,
-            totalDailyRequests: 0
+            totalDailyRequests: 0,
+            models: Object.keys(this.models)
         };
 
         this.apiKeys.forEach((_, keyIndex) => {
-            const flashUsage = this.usage[keyIndex]['gemini-2.5-flash'];
-            const liteUsage = this.usage[keyIndex]['gemini-2.5-flash-lite'];
-
-            stats.keys.push({
+            const keyUsage = {
                 keyIndex,
-                flash: {
-                    rpm: flashUsage.requestCount,
-                    rpd: flashUsage.dailyCount
-                },
-                flashLite: {
-                    rpm: liteUsage.requestCount,
-                    rpd: liteUsage.dailyCount
-                }
+                modelUsage: {}
+            };
+
+            Object.keys(this.models).forEach(model => {
+                const mUsage = this.usage[keyIndex][model];
+                keyUsage.modelUsage[model] = {
+                    rpm: mUsage.requestCount,
+                    rpd: mUsage.dailyCount
+                };
+                stats.totalRequests += mUsage.requestCount;
+                stats.totalDailyRequests += mUsage.dailyCount;
             });
 
-            stats.totalRequests += flashUsage.requestCount + liteUsage.requestCount;
-            stats.totalDailyRequests += flashUsage.dailyCount + liteUsage.dailyCount;
+            stats.keys.push(keyUsage);
         });
 
         return stats;

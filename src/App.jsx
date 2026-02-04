@@ -12,6 +12,17 @@ const ArchitectureDiagramGenerator = () => {
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(null);
     const [currentModel, setCurrentModel] = useState('');
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+
+    React.useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+            setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Initialize rate limiter once
     const rateLimiterRef = useRef(null);
@@ -89,7 +100,13 @@ Identify all major components, their relationships, and organize them into logic
                 const estimatedTokens = Math.ceil(promptText.length / 4) + 2000; // +2000 for response
 
                 // Get optimal key and model
-                const { keyIndex, model } = await rateLimiter.getKeyAndModel(estimatedTokens);
+                const available = await rateLimiter.getKeyAndModel(estimatedTokens);
+
+                if (!available) {
+                    throw new Error('Daily generation limit reached for all available free models. Please try again in 24 hours or provide your own API key in the configuration.');
+                }
+
+                const { keyIndex, model } = available;
                 const apiKey = rateLimiter.apiKeys[keyIndex];
 
                 setCurrentModel(`${model} (Key ${keyIndex + 1}/5)`);
@@ -169,12 +186,12 @@ Identify all major components, their relationships, and organize them into logic
     };
 
     const layoutDiagram = (architecture, systemName) => {
-        const COMPONENT_WIDTH = 180;
-        const COMPONENT_HEIGHT = 80;
-        const COMPONENT_GAP_X = 60;
-        const LAYER_HEIGHT = 200;
-        const PADDING_TOP = 100; // Extra space for title
-        const PADDING_SIDE = 80;
+        const COMPONENT_WIDTH = isMobile ? 140 : (isTablet ? 160 : 180);
+        const COMPONENT_HEIGHT = isMobile ? 70 : 80;
+        const COMPONENT_GAP_X = isMobile ? 30 : (isTablet ? 45 : 60);
+        const LAYER_HEIGHT = isMobile ? 180 : 200;
+        const PADDING_TOP = isMobile ? 80 : 100;
+        const PADDING_SIDE = isMobile ? 20 : (isTablet ? 40 : 80);
         const LAYER_LABEL_HEIGHT = 40;
 
         // 1. Calculate Dynamic Canvas Width
@@ -184,7 +201,7 @@ Identify all major components, their relationships, and organize them into logic
         });
 
         const calculatedWidth = (maxComponentsInLayer * (COMPONENT_WIDTH + COMPONENT_GAP_X)) + (PADDING_SIDE * 2);
-        const width = Math.max(1200, calculatedWidth);
+        const width = Math.max(isMobile ? 350 : 1200, calculatedWidth);
         const height = PADDING_TOP + (architecture.layers.length * LAYER_HEIGHT);
 
         const components = architecture.components.map(comp => {
@@ -239,14 +256,48 @@ Identify all major components, their relationships, and organize them into logic
     const downloadSVG = () => {
         if (!diagram) return;
         const svgElement = document.getElementById('architecture-svg');
-        const svgData = new XMLSerializer().serializeToString(svgElement);
-        const blob = new Blob([svgData], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
+        if (!svgElement) {
+            console.error('SVG element not found');
+            return;
+        }
+
+        // Clone for serialization
+        const clonedSvg = svgElement.cloneNode(true);
+        clonedSvg.setAttribute('version', '1.1');
+        clonedSvg.setAttribute('baseProfile', 'full');
+        clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        clonedSvg.setAttribute('xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
+
+        // Serialize to XML
+        const serializer = new XMLSerializer();
+        let svgData = serializer.serializeToString(clonedSvg);
+
+        if (!svgData.startsWith('<?xml')) {
+            svgData = '<?xml version="1.0" standalone="no"?>\n' + svgData;
+        }
+
+        // Alternative Method: Data URI (Base64)
+        // This embeds the file directly into the link, bypassing Blob management
+        const base64Data = btoa(unescape(encodeURIComponent(svgData)));
+        const dataUri = `data:image/svg+xml;base64,${base64Data}`;
+
+        // Sanitize filename
+        const safeName = diagram.systemName
+            .replace(/[^\w\s-]/g, '')
+            .trim()
+            .replace(/\s+/g, '-');
+
         const link = document.createElement('a');
-        link.href = url;
-        link.download = `${diagram.systemName.replace(/\s+/g, '-')}-architecture.svg`;
+        link.href = dataUri;
+        link.download = `${safeName || 'architecture'}-diagram.svg`;
+
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(url);
+
+        // Cleanup
+        setTimeout(() => {
+            document.body.removeChild(link);
+        }, 500);
     };
 
     const loadExample = () => {
@@ -258,7 +309,7 @@ Identify all major components, their relationships, and organize them into logic
         <div style={{
             minHeight: '100vh',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            padding: '2rem',
+            padding: isMobile ? '1rem' : '2rem',
             fontFamily: '"Space Grotesk", system-ui, sans-serif'
         }}>
             <style>
@@ -279,41 +330,24 @@ Identify all major components, their relationships, and organize them into logic
         `}
             </style>
 
-            <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            <div style={{ maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
                 {/* Header */}
-                <div style={{ textAlign: 'center', marginBottom: '3rem', animation: 'fadeInUp 0.6s ease-out' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                        <Network size={48} color="white" />
-                        <h1 style={{ fontSize: '3.5rem', color: 'white', margin: 0, fontWeight: 700, textShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+                <div style={{ textAlign: 'center', marginBottom: isMobile ? '2rem' : '3rem', animation: 'fadeInUp 0.6s ease-out' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '1rem', marginBottom: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <Network size={isMobile ? 32 : 48} color="white" />
+                        <h1 style={{ fontSize: isMobile ? '1.75rem' : '3.5rem', color: 'white', margin: 0, fontWeight: 700, textShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
                             Architecture Diagram Generator
                         </h1>
                     </div>
-                    <p style={{ fontSize: '1.25rem', color: 'rgba(255,255,255,0.9)', maxWidth: '600px', margin: '0 auto' }}>
+                    <p style={{ fontSize: isMobile ? '1rem' : '1.25rem', color: 'rgba(255,255,255,0.9)', maxWidth: '600px', margin: '0 auto' }}>
                         Transform natural language descriptions into detailed solution architecture diagrams
-                    </p>
-                    <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)', marginTop: '0.5rem' }}>
-                        Powered by Gemini with Smart Rate Limiting (5 API Keys, 2 Models)
                     </p>
                 </div>
 
-                {/* Stats Panel */}
-                {stats && (
-                    <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '16px', padding: '1rem', marginBottom: '2rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Activity size={20} />
-                            <span>Current Model: {currentModel}</span>
-                        </div>
-                        <div>
-                            Total Requests Today: {stats.totalDailyRequests}
-                        </div>
-                        <div>
-                            Keys Active: {stats.keys.filter(k => k.flash.rpd > 0 || k.flashLite.rpd > 0).length}/5
-                        </div>
-                    </div>
-                )}
+
 
                 {/* Input Form */}
-                <div style={{ background: 'white', borderRadius: '20px', padding: '2.5rem', marginBottom: '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', animation: 'fadeInUp 0.6s ease-out 0.1s both' }}>
+                <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1.5rem' : '2.5rem', marginBottom: '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', animation: 'fadeInUp 0.6s ease-out 0.1s both' }}>
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
                             System Name
@@ -386,9 +420,9 @@ Identify all major components, their relationships, and organize them into logic
 
                 {/* Diagram Display - Same as before, truncated for brevity */}
                 {diagram && (
-                    <div style={{ background: 'white', borderRadius: '20px', padding: '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+                    <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1rem' : '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '2px solid #f3f4f6', flexWrap: 'wrap', gap: '1rem' }}>
-                            <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                            <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.75rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
                                 {diagram.systemName}
                             </h2>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -405,7 +439,16 @@ Identify all major components, their relationships, and organize them into logic
                             </div>
                         </div>
                         <div style={{ overflow: 'auto', background: '#f9fafb', borderRadius: '12px', padding: '2rem' }}>
-                            <svg id="architecture-svg" width={diagram.width} height={diagram.height} style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.2s' }}>
+                            <svg
+                                id="architecture-svg"
+                                xmlns="http://www.w3.org/2000/svg"
+                                xmlnsXhtml="http://www.w3.org/1999/xhtml"
+                                version="1.1"
+                                baseProfile="full"
+                                width={diagram.width}
+                                height={diagram.height}
+                                style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.2s' }}
+                            >
                                 <rect width={diagram.width} height={diagram.height} fill="white" />
 
                                 {diagram.layers.map((layer, idx) => {
@@ -570,19 +613,9 @@ Identify all major components, their relationships, and organize them into logic
                     </div>
                 )}
 
-                {/* Info Box */}
-                <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.2)', color: 'white' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-                        How Smart Rate Limiting Works
-                    </h3>
-                    <ol style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: '1.8' }}>
-                        <li>5 API keys rotate automatically to distribute load</li>
-                        <li>Starts with Gemini 2.5 Flash (best quality)</li>
-                        <li>Falls back to Flash-Lite if rate limited</li>
-                        <li>Throttles requests to stay under RPM/TPM limits</li>
-                        <li>Auto-retries with exponential backoff on 429 errors</li>
-                        <li>100% FREE - up to 1,250 diagrams per day!</li>
-                    </ol>
+                {/* Footer Note */}
+                <div style={{ marginTop: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
+                    Powered by Google Gemini • Prototyped with Antigravity
                 </div>
             </div>
         </div >
