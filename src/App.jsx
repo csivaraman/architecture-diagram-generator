@@ -4,7 +4,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import RateLimiter from './RateLimiter';
 
 const ArchitectureDiagramGenerator = () => {
-    const [systemName, setSystemName] = useState('');
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [diagram, setDiagram] = useState(null);
@@ -48,6 +47,7 @@ const ArchitectureDiagramGenerator = () => {
 Your response must have this exact structure:
 
 {
+  "systemName": "A short, descriptive title for the system (e.g. 'E-Commerce Platform', 'Data Processing Pipeline')",
   "components": [
     {
       "id": "unique-id",
@@ -76,8 +76,8 @@ Your response must have this exact structure:
 Identify all major components, their relationships, and organize them into logical architectural layers. If the system has end users, web browsers, or mobile apps that interact with the system, include them as "user" type components in a "Client" layer at the top. Common layer names: Client (users, browsers, mobile apps), Presentation (frontend apps, UI), Application (backend services, APIs), Data (databases, caches), Infrastructure (queues, external services).`;
 
     const generateDiagram = async () => {
-        if (!systemName || !description) {
-            setError('Please provide both system name and description');
+        if (!description) {
+            setError('Please provide a system description');
             return;
         }
 
@@ -90,13 +90,17 @@ Identify all major components, their relationships, and organize them into logic
         setLoading(true);
         setError(null);
 
-        const MAX_RETRIES = 3;
+        const MAX_RETRIES = 5; // Increased retries since we might switch keys/models
         let retryCount = 0;
+
+        // Keep track of current attempt details for error handling
+        let currentKeyIndex = -1;
+        let currentModelName = '';
 
         while (retryCount < MAX_RETRIES) {
             try {
                 // Estimate tokens (rough estimate: ~4 chars per token)
-                const promptText = SYSTEM_PROMPT + systemName + description;
+                const promptText = SYSTEM_PROMPT + description;
                 const estimatedTokens = Math.ceil(promptText.length / 4) + 2000; // +2000 for response
 
                 // Get optimal key and model
@@ -107,10 +111,13 @@ Identify all major components, their relationships, and organize them into logic
                 }
 
                 const { keyIndex, model } = available;
+                currentKeyIndex = keyIndex;
+                currentModelName = model;
+
                 const apiKey = rateLimiter.apiKeys[keyIndex];
 
                 setCurrentModel(`${model} (Key ${keyIndex + 1}/5)`);
-                console.log(`Using ${model} with API key ${keyIndex + 1}`);
+                console.log(`%c[GenAI Request] Using Model: ${model} | API Key Index: ${keyIndex + 1}`, 'color: #3b82f6; font-weight: bold;');
 
                 // Initialize Gemini with selected key and model
                 const genAI = new GoogleGenerativeAI(apiKey);
@@ -123,7 +130,7 @@ Identify all major components, their relationships, and organize them into logic
                     contents: [{
                         role: 'user',
                         parts: [{
-                            text: `${SYSTEM_PROMPT}\n\nSystem Name: ${systemName}\n\nDescription: ${description}\n\nGenerate the architecture JSON.`
+                            text: `${SYSTEM_PROMPT}\n\nDescription: ${description}\n\nGenerate the architecture JSON.`
                         }]
                     }]
                 });
@@ -156,7 +163,9 @@ Identify all major components, their relationships, and organize them into logic
                     throw new Error('Invalid architecture structure returned');
                 }
 
-                const visualDiagram = layoutDiagram(architecture, systemName);
+                // Use generated system name or fallback
+                const generatedSystemName = architecture.systemName || 'System Architecture';
+                const visualDiagram = layoutDiagram(architecture, generatedSystemName);
                 setDiagram(visualDiagram);
                 setLoading(false);
                 return; // Success!
@@ -166,10 +175,15 @@ Identify all major components, their relationships, and organize them into logic
 
                 // Check if it's a rate limit error
                 if (err.message && (err.message.includes('429') || err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+                    // Critical: Report this to the rate limiter so it doesn't give us the same key/model again
+                    if (currentKeyIndex !== -1 && currentModelName) {
+                        rateLimiter.reportQuotaExceeded(currentKeyIndex, currentModelName);
+                    }
+
                     retryCount++;
                     if (retryCount < MAX_RETRIES) {
-                        const waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff
-                        console.log(`Rate limit hit. Waiting ${waitTime / 1000}s before retry ${retryCount}/${MAX_RETRIES}...`);
+                        const waitTime = 1000; // Short wait, we want to try next key immediately
+                        console.log(`Rate limit hit on Key ${currentKeyIndex + 1}. Switching keys/models...`);
                         await rateLimiter.sleep(waitTime);
                         continue;
                     }
@@ -190,7 +204,7 @@ Identify all major components, their relationships, and organize them into logic
         const COMPONENT_HEIGHT = isMobile ? 70 : 80;
         const COMPONENT_GAP_X = isMobile ? 30 : (isTablet ? 45 : 60);
         const LAYER_HEIGHT = isMobile ? 180 : 200;
-        const PADDING_TOP = isMobile ? 80 : 100;
+        const PADDING_TOP = isMobile ? 20 : 40;
         const PADDING_SIDE = isMobile ? 20 : (isTablet ? 40 : 80);
         const LAYER_LABEL_HEIGHT = 40;
 
@@ -301,7 +315,6 @@ Identify all major components, their relationships, and organize them into logic
     };
 
     const loadExample = () => {
-        setSystemName('E-Commerce Platform');
         setDescription('A scalable e-commerce platform with microservices architecture. Users can browse products, add items to cart, and checkout. The system includes product catalog, user authentication, payment processing, order management, and inventory tracking. Uses React frontend, Node.js microservices, PostgreSQL for transactional data, Redis for caching, and RabbitMQ for async communication between services.');
     };
 
@@ -348,20 +361,6 @@ Identify all major components, their relationships, and organize them into logic
 
                 {/* Input Form */}
                 <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1.5rem' : '2.5rem', marginBottom: '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', animation: 'fadeInUp 0.6s ease-out 0.1s both' }}>
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
-                            System Name
-                        </label>
-                        <input
-                            type="text"
-                            value={systemName}
-                            onChange={(e) => setSystemName(e.target.value)}
-                            placeholder="e.g., E-Commerce Platform"
-                            style={{ width: '100%', padding: '1rem', fontSize: '1rem', border: '2px solid #e5e7eb', borderRadius: '12px', transition: 'all 0.2s', outline: 'none' }}
-                            onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                            onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                        />
-                    </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
@@ -421,11 +420,26 @@ Identify all major components, their relationships, and organize them into logic
                 {/* Diagram Display - Same as before, truncated for brevity */}
                 {diagram && (
                     <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1rem' : '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '2px solid #f3f4f6', flexWrap: 'wrap', gap: '1rem' }}>
-                            <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.75rem', fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginBottom: '1.5rem',
+                            paddingBottom: '1rem',
+                            borderBottom: '2px solid #f3f4f6',
+                            flexDirection: isMobile ? 'column' : 'row',
+                            position: 'relative',
+                            gap: '1rem'
+                        }}>
+                            <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.75rem', fontWeight: 700, color: '#1f2937', margin: 0, textAlign: 'center' }}>
                                 {diagram.systemName}
                             </h2>
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <div style={{
+                                display: 'flex',
+                                gap: '0.5rem',
+                                position: isMobile ? 'static' : 'absolute',
+                                right: isMobile ? 'auto' : 0
+                            }}>
                                 <button onClick={() => setZoom(Math.min(zoom + 0.2, 3))} style={{ padding: '0.5rem', background: '#f3f4f6', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
                                     <ZoomIn size={20} />
                                 </button>
@@ -442,7 +456,6 @@ Identify all major components, their relationships, and organize them into logic
                             <svg
                                 id="architecture-svg"
                                 xmlns="http://www.w3.org/2000/svg"
-                                xmlnsXhtml="http://www.w3.org/1999/xhtml"
                                 version="1.1"
                                 baseProfile="full"
                                 width={diagram.width}
@@ -584,16 +597,7 @@ Identify all major components, their relationships, and organize them into logic
                                     );
                                 })}
 
-                                <text
-                                    x={diagram.width / 2}
-                                    y={60}
-                                    fontSize="28"
-                                    fontWeight="800"
-                                    fill="#1f2937"
-                                    textAnchor="middle"
-                                >
-                                    {diagram.systemName} Architecture
-                                </text>
+
                             </svg>
                         </div>
                         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>

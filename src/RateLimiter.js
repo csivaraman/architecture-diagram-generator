@@ -163,7 +163,26 @@ class RateLimiter {
     }
 
     /**
+     * Report that a key/model combination hit a quota limit (429)
+     * This forces the limiter to skip this combination for the rest of the day
+     */
+    reportQuotaExceeded(keyIndex, model) {
+        if (!this.usage[keyIndex] || !this.usage[keyIndex][model]) return;
+
+        const usage = this.usage[keyIndex][model];
+        const limits = this.models[model];
+
+        // artificially set daily count to limit to prevent reuse
+        usage.dailyCount = limits.rpd + 1;
+
+        console.log(`Reported quota exceeded for Key ${keyIndex + 1} on ${model}. Marking as exhausted for today.`);
+    }
+
+    /**
      * Record a successful request
+     * @param {number} keyIndex 
+     * @param {string} model 
+     * @param {number} tokensUsed 
      */
     recordRequest(keyIndex, model, tokensUsed) {
         this.resetCountersIfNeeded(keyIndex, model);
