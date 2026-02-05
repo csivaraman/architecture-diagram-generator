@@ -108,7 +108,27 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: modelName });
 
-            const result = await model.generateContent(prompt);
+            let result;
+            let retryCount = 0;
+            const MAX_RETRIES = 1; // User specifically asked to wait and retry. We'll allow 1 major retry cycle (waiting 10s).
+
+            while (true) {
+                try {
+                    result = await model.generateContent(prompt);
+                    break; // Success
+                } catch (reqErr) {
+                    const msg = reqErr.message || '';
+                    const isOverloaded = msg.includes('503') || msg.includes('overloaded') || msg.includes('Service Unavailable');
+
+                    if (isOverloaded && retryCount < MAX_RETRIES) {
+                        console.warn(`[Diagram Service] Model Overloaded (503). Waiting 10s before retrying with same key...`);
+                        await new Promise(resolve => setTimeout(resolve, 10000));
+                        retryCount++;
+                        continue;
+                    }
+                    throw reqErr; // Re-throw if not 503 or max retries reached
+                }
+            }
             const response = await result.response;
             const text = response.text();
 
