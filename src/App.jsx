@@ -3,6 +3,61 @@ import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Act
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import RateLimiter from './RateLimiter';
 
+
+const RateLimitStatus = ({ stats }) => {
+    if (!stats) return null;
+
+    return (
+        <div style={{
+            position: 'fixed',
+            bottom: '1rem',
+            left: '1rem',
+            zIndex: 100,
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '12px',
+            padding: '1rem',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+            border: '1px solid rgba(0,0,0,0.05)',
+            maxWidth: '300px',
+            fontSize: '0.8rem'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', borderBottom: '1px solid #eee', paddingBottom: '0.5rem' }}>
+                <Activity size={16} color="#667eea" />
+                <span style={{ fontWeight: 700, color: '#1f2937' }}>API Health Status</span>
+            </div>
+
+            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                {stats.keys.map((keyStats, idx) => {
+                    // Check if any model on this key is active
+                    const models = Object.values(keyStats.modelUsage);
+                    const isExhausted = models.every(m => m.status === 'exhausted');
+                    const totalDaily = models.reduce((acc, curr) => acc + curr.rpd, 0);
+
+                    return (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center' }}>
+                            <span style={{ color: '#4b5563' }}>Key {idx + 1}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ color: '#6b7280' }}>{totalDaily} reqs</span>
+                                <span style={{
+                                    display: 'inline-block',
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: isExhausted ? '#ef4444' : '#10b981'
+                                }} />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: '#9ca3af', textAlign: 'center' }}>
+                Resets daily at midnight PST
+            </div>
+        </div>
+    );
+};
+
 const ArchitectureDiagramGenerator = () => {
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
@@ -41,6 +96,13 @@ const ArchitectureDiagramGenerator = () => {
 
         rateLimiterRef.current = new RateLimiter(apiKeys);
     }
+
+    // Load initial stats
+    React.useEffect(() => {
+        if (rateLimiterRef.current) {
+            setStats(rateLimiterRef.current.getStats());
+        }
+    }, []);
 
     const SYSTEM_PROMPT = `You are an expert solution architect. Analyze the provided system description and return ONLY a valid JSON object with no markdown formatting, no code blocks, no explanation. Just pure JSON.
 
@@ -622,6 +684,8 @@ Identify all major components, their relationships, and organize them into logic
                     Powered by Google Gemini • Prototyped with Antigravity
                 </div>
             </div>
+
+            <RateLimitStatus stats={stats} />
         </div >
     );
 };

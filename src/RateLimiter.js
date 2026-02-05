@@ -55,6 +55,51 @@ class RateLimiter {
         // Request queue
         this.requestQueue = [];
         this.processing = false;
+
+        // Initialize persistence
+        this.STORAGE_KEY = 'gemini_rate_limiter_v1';
+        this._load();
+    }
+
+    /**
+     * Load usage stats from localStorage
+     */
+    _load() {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+
+        try {
+            const saved = window.localStorage.getItem(this.STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.usage) {
+                    // Restore usage if keys align
+                    this.apiKeys.forEach((_, index) => {
+                        if (parsed.usage[index]) {
+                            this.usage[index] = parsed.usage[index];
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load rate limiter stats:', e);
+        }
+    }
+
+    /**
+     * Save usage stats to localStorage
+     */
+    _save() {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+
+        try {
+            const data = {
+                usage: this.usage,
+                lastSave: Date.now()
+            };
+            window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.error('Failed to save rate limiter stats:', e);
+        }
     }
 
     /**
@@ -76,19 +121,24 @@ class RateLimiter {
         const usage = this.usage[keyIndex][model];
         const now = Date.now();
         const midnightPT = this.getMidnightPT();
+        let changed = false;
 
         // Reset minute counters (rolling 60-second window)
         if (now - usage.lastResetMinute >= 60000) {
             usage.requestCount = 0;
             usage.tokenCount = 0;
             usage.lastResetMinute = now;
+            changed = true;
         }
 
         // Reset daily counters at midnight PT
         if (midnightPT > usage.lastResetDay) {
             usage.dailyCount = 0;
             usage.lastResetDay = midnightPT;
+            changed = true;
         }
+
+        if (changed) this._save();
     }
 
     /**
@@ -176,6 +226,7 @@ class RateLimiter {
         usage.dailyCount = limits.rpd + 1;
 
         console.log(`Reported quota exceeded for Key ${keyIndex + 1} on ${model}. Marking as exhausted for today.`);
+        this._save();
     }
 
     /**
@@ -195,6 +246,7 @@ class RateLimiter {
         // Update current key index for round-robin
         this.currentKeyIndex = (keyIndex + 1) % this.apiKeys.length;
         this.currentModel = model;
+        this._save();
     }
 
     /**
@@ -260,9 +312,18 @@ class RateLimiter {
 
             Object.keys(this.models).forEach(model => {
                 const mUsage = this.usage[keyIndex][model];
+                const limits = this.models[model];
+
+                let status = 'active';
+                if (mUsage.dailyCount >= Math.floor(limits.rpd * this.SAFETY_FACTOR)) {
+                    status = 'exhausted';
+                }
+
                 keyUsage.modelUsage[model] = {
                     rpm: mUsage.requestCount,
-                    rpd: mUsage.dailyCount
+                    rpd: mUsage.dailyCount,
+                    limit: limits.rpd,
+                    status: status
                 };
                 stats.totalRequests += mUsage.requestCount;
                 stats.totalDailyRequests += mUsage.dailyCount;
