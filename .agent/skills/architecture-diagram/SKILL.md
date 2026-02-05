@@ -93,8 +93,19 @@ Identify all major components, their relationships, and organize them into logic
   - Logical entry/exit points (top/bottom/sides)
   - Adequate spacing between all elements
 
-### NO Environment Variables Needed
-- No .env.local file
-- No API key setup
-- No external service configuration
-- Just works out of the box!
+- **In-Memory Caching Implementation**:
+  - Generate cache keys using SHA-256 hash of normalized system descriptions.
+  - Normalize text: lowercase, trim, collapse spaces.
+  - Store results for 4 hours (14400 seconds).
+  - **Limit**: Store a maximum of 25 records.
+  - **Eviction**: Use FIFO (First-In-First-Out) to remove oldest items when the limit is reached.
+  - Return cached JSON if available without calling Gemini API.
+- **Service Endpoints**:
+  - `POST /api/generate-diagram`: Main generation logic with caching.
+  - `GET /api/cache/stats`: Monitor cache performance.
+  - `DELETE /api/cache`: Clear all cache manually.
+  - `GET /api/health`: Monitor service status.
+
+### NO Environment Variables Needed (Service Mode)
+- Service handles multiple Gemini API keys.
+- Frontend talks to local server.

@@ -1,64 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Activity } from 'lucide-react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import RateLimiter from './RateLimiter';
+import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle } from 'lucide-react';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
 
 
-const RateLimitStatus = ({ stats }) => {
-    if (!stats) return null;
-
-    return (
-        <div style={{
-            position: 'fixed',
-            bottom: '1rem',
-            left: '1rem',
-            zIndex: 100,
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '12px',
-            padding: '1rem',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-            border: '1px solid rgba(0,0,0,0.05)',
-            maxWidth: '300px',
-            fontSize: '0.8rem'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', borderBottom: '1px solid #eee', paddingBottom: '0.5rem' }}>
-                <Activity size={16} color="#667eea" />
-                <span style={{ fontWeight: 700, color: '#1f2937' }}>API Health Status</span>
-            </div>
-
-            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                {stats.keys.map((keyStats, idx) => {
-                    // Check if any model on this key is active
-                    const models = Object.values(keyStats.modelUsage);
-                    const isExhausted = models.every(m => m.status === 'exhausted');
-                    const totalDaily = models.reduce((acc, curr) => acc + curr.rpd, 0);
-
-                    return (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center' }}>
-                            <span style={{ color: '#4b5563' }}>Key {idx + 1}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ color: '#6b7280' }}>{totalDaily} reqs</span>
-                                <span style={{
-                                    display: 'inline-block',
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: isExhausted ? '#ef4444' : '#10b981'
-                                }} />
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-            <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: '#9ca3af', textAlign: 'center' }}>
-                Resets daily at midnight PST
-            </div>
-        </div>
-    );
-};
 
 const ArchitectureDiagramGenerator = () => {
     const [description, setDescription] = useState('');
@@ -66,8 +11,6 @@ const ArchitectureDiagramGenerator = () => {
     const [diagram, setDiagram] = useState(null);
     const [zoom, setZoom] = useState(1);
     const [error, setError] = useState(null);
-    const [stats, setStats] = useState(null);
-    const [currentModel, setCurrentModel] = useState('');
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
 
@@ -80,64 +23,7 @@ const ArchitectureDiagramGenerator = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Initialize rate limiter once
-    const rateLimiterRef = useRef(null);
 
-    if (!rateLimiterRef.current) {
-        const apiKeys = [
-            import.meta.env.VITE_GEMINI_API_KEY_1,
-            import.meta.env.VITE_GEMINI_API_KEY_2,
-            import.meta.env.VITE_GEMINI_API_KEY_3,
-            import.meta.env.VITE_GEMINI_API_KEY_4,
-            import.meta.env.VITE_GEMINI_API_KEY_5,
-        ].filter(Boolean); // Remove any undefined keys
-
-        if (apiKeys.length === 0) {
-            console.error('No API keys found! Please add them to .env.local');
-        }
-
-        rateLimiterRef.current = new RateLimiter(apiKeys);
-    }
-
-    // Load initial stats
-    React.useEffect(() => {
-        if (rateLimiterRef.current) {
-            setStats(rateLimiterRef.current.getStats());
-        }
-    }, []);
-
-    const SYSTEM_PROMPT = `You are an expert solution architect. Analyze the provided system description and return ONLY a valid JSON object with no markdown formatting, no code blocks, no explanation. Just pure JSON.
-
-Your response must have this exact structure:
-
-{
-  "systemName": "A short, descriptive title for the system (e.g. 'E-Commerce Platform', 'Data Processing Pipeline')",
-  "components": [
-    {
-      "id": "unique-id",
-      "name": "Component Name",
-      "type": "user|frontend|backend|database|cache|queue|api|service|external",
-      "description": "Brief description",
-      "technologies": ["tech1", "tech2"]
-    }
-  ],
-  "connections": [
-    {
-      "from": "component-id",
-      "to": "component-id",
-      "label": "HTTP/HTTPS/gRPC/etc",
-      "type": "sync|async|bidirectional"
-    }
-  ],
-  "layers": [
-    {
-      "name": "Client|Presentation|Application|Data|Infrastructure",
-      "componentIds": ["id1", "id2"]
-    }
-  ]
-}
-
-Identify all major components, their relationships, and organize them into logical architectural layers. If the system has end users, web browsers, or mobile apps that interact with the system, include them as "user" type components in a "Client" layer at the top. Common layer names: Client (users, browsers, mobile apps), Presentation (frontend apps, UI), Application (backend services, APIs), Data (databases, caches), Infrastructure (queues, external services).`;
 
     const generateDiagram = async (overrideDescription) => {
         // Handle both event objects (from button click) and direct string input (from tests)
@@ -148,140 +34,53 @@ Identify all major components, their relationships, and organize them into logic
             return;
         }
 
-        const rateLimiter = rateLimiterRef.current;
-        if (!rateLimiter || rateLimiter.apiKeys.length === 0) {
-            setError('No API keys configured. Please add them to .env.local file');
-            return;
-        }
-
         setLoading(true);
         setError(null);
 
-        const MAX_RETRIES = 5; // Increased retries since we might switch keys/models
-        let retryCount = 0;
+        try {
+            const response = await fetch('http://localhost:3001/api/generate-diagram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ systemDescription: descToUse }),
+            });
 
-        // Keep track of current attempt details for error handling
-        let persistentAvailable = null;
-        let currentKeyIndex = -1;
-        let currentModelName = '';
+            const result = await response.json();
 
-        while (retryCount < MAX_RETRIES) {
-            try {
-                // Estimate tokens (rough estimate: ~4 chars per token)
-                const promptText = SYSTEM_PROMPT + descToUse;
-                const estimatedTokens = Math.ceil(promptText.length / 4) + 2000; // +2000 for response
-
-                // Get optimal key and model (use previous if it was a 503 retry)
-                const available = persistentAvailable || await rateLimiter.getKeyAndModel(estimatedTokens);
-                persistentAvailable = null; // Clear it for next time
-
-                if (!available) {
-                    throw new Error('Daily generation limit reached for all available free models. Please try again in 24 hours or provide your own API key in the configuration.');
-                }
-
-                const { keyIndex, model } = available;
-                currentKeyIndex = keyIndex;
-                currentModelName = model;
-
-                const apiKey = rateLimiter.apiKeys[keyIndex];
-
-                setCurrentModel(`${model} (Key ${keyIndex + 1}/5)`);
-                console.log(`%c[GenAI Request] Using Model: ${model} | API Key Index: ${keyIndex + 1}`, 'color: #3b82f6; font-weight: bold;');
-
-                // Initialize Gemini with selected key and model
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const geminiModel = genAI.getGenerativeModel({
-                    model: model
-                });
-
-                // Generate content
-                const result = await geminiModel.generateContent({
-                    contents: [{
-                        role: 'user',
-                        parts: [{
-                            text: `${SYSTEM_PROMPT}\n\nDescription: ${descToUse}\n\nGenerate the architecture JSON.`
-                        }]
-                    }]
-                });
-
-                const response = await result.response;
-                const text = response.text();
-
-                // Record successful request
-                const actualTokens = estimatedTokens; // In production, use response.usageMetadata
-                rateLimiter.recordRequest(keyIndex, model, actualTokens);
-
-                // Update stats
-                setStats(rateLimiter.getStats());
-
-                // Parse JSON
-                const cleanedContent = text
-                    .replace(/```json\n?/g, '')
-                    .replace(/```\n?/g, '')
-                    .trim();
-
-                let architecture;
-                try {
-                    architecture = JSON.parse(cleanedContent);
-                } catch (parseError) {
-                    console.error('Raw response:', text);
-                    throw new Error('Failed to parse architecture JSON. Please try again.');
-                }
-
-                if (!architecture.components || !architecture.connections || !architecture.layers) {
-                    throw new Error('Invalid architecture structure returned');
-                }
-
-                // Use generated system name or fallback
-                const generatedSystemName = architecture.systemName || 'System Architecture';
-                const visualDiagram = layoutDiagram(architecture, generatedSystemName);
-                setDiagram(visualDiagram);
-                setLoading(false);
-                return; // Success!
-
-            } catch (err) {
-                console.error(`Attempt ${retryCount + 1} failed:`, err);
-
-                // Handle 503 Model Overloaded specifically (Retry same key/model after 10s)
-                const errorMsg = err.message || '';
-                if (errorMsg.includes('503') || errorMsg.toLowerCase().includes('overloaded')) {
-                    retryCount++;
-                    if (retryCount < MAX_RETRIES) {
-                        console.log(`%c[GenAI Retry] Model overloaded (503). Retrying after 10s delay with Key ${currentKeyIndex + 1}...`, 'color: #f59e0b; font-weight: bold;');
-
-                        // Keep the same key and model for retry
-                        persistentAvailable = { keyIndex: currentKeyIndex, model: currentModelName };
-
-                        // Wait 10 seconds as requested
-                        await new Promise(resolve => setTimeout(resolve, 10000));
-                        continue;
-                    }
-                }
-
-                // Check if it's a rate limit error (429)
-                if (errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
-                    // Critical: Report this to the rate limiter so it doesn't give us the same key/model again
-                    if (currentKeyIndex !== -1 && currentModelName) {
-                        rateLimiter.reportQuotaExceeded(currentKeyIndex, currentModelName);
-                    }
-
-                    retryCount++;
-                    if (retryCount < MAX_RETRIES) {
-                        const waitTime = 1000; // Short wait, we want to try next key immediately
-                        console.log(`Rate limit hit on Key ${currentKeyIndex + 1}. Switching keys/models...`);
-                        await rateLimiter.sleep(waitTime);
-                        continue;
-                    }
-                }
-
-                setError(`Failed to generate diagram: ${err.message}`);
-                setLoading(false);
-                return;
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to generate diagram');
             }
-        }
 
-        setError('Maximum retries exceeded. Please try again in a minute.');
-        setLoading(false);
+            const architecture = result.diagram;
+            const fromCache = result.fromCache;
+
+            if (fromCache) {
+                console.log('%c[Cache Hit] Received diagram from backend cache', 'color: #10b981; font-weight: bold;');
+            } else {
+                const { keyId, model } = result.diagnostics || {};
+                console.log(
+                    `%c[Service Request] Received fresh diagram from Gemini (Key #${keyId || '?'}, Model: ${model || 'unknown'})`,
+                    'color: #3b82f6; font-weight: bold;'
+                );
+            }
+
+            if (!architecture.components || !architecture.connections || !architecture.layers) {
+                throw new Error('Invalid architecture structure returned');
+            }
+
+            // Use generated system name or fallback
+            const generatedSystemName = architecture.systemName || 'System Architecture';
+            const visualDiagram = layoutDiagram(architecture, generatedSystemName);
+            setDiagram(visualDiagram);
+            setLoading(false);
+            return; // Success!
+
+        } catch (err) {
+            console.error('[Frontend] Generation Error:', err);
+            setError(`Failed to generate diagram: ${err.message}`);
+            setLoading(false);
+        }
     };
 
     const layoutDiagram = (architecture, systemName) => {

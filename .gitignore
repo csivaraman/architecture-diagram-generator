@@ -119,3 +119,6 @@ dist
 
 # Mac
 .DS_Store
+
+# Rate Limiter Stats
+rate_limiter_stats.json
