@@ -685,7 +685,7 @@ Identify all major components, their relationships, and organize them into logic
                 </div>
             </div>
 
-            <RateLimitStatus stats={stats} />
+            {/* <RateLimitStatus stats={stats} /> */}
         </div >
     );
 };
