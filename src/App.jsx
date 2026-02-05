@@ -38,7 +38,7 @@ const ArchitectureDiagramGenerator = () => {
         setError(null);
 
         try {
-            const response = await fetch('http://localhost:3001/api/generate-diagram', {
+            const response = await fetch('/api/generate-diagram', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

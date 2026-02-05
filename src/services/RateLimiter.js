@@ -79,9 +79,16 @@ class RateLimiter {
                 usage: this.usage,
                 lastSave: Date.now()
             };
+            // Note: In Vercel serverless functions, this may fail due to read-only FS.
+            // We catch it so the function doesn't crash.
+            if (process.env.VERCEL) {
+                // Skip file persistence on Vercel to avoid error noise, 
+                // as it won't persist across cold starts anyway.
+                return;
+            }
             fs.writeFileSync(STORAGE_PATH, JSON.stringify(data, null, 2));
         } catch (e) {
-            console.error('[RateLimiter] Failed to save stats:', e.message);
+            // Silently fail if FS is read-only
         }
     }
 

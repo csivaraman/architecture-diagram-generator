@@ -3,7 +3,12 @@ import { getCachedDiagram, setCachedDiagram } from './cache.js';
 import RateLimiter from './RateLimiter.js';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '.env.local' });
+// Try to load .env.local, but don't fail if it's missing (Vercel uses production env vars)
+try {
+    dotenv.config({ path: ".env.local" });
+} catch (e) {
+    // Standard environment variables will be used
+}
 
 /**
  * Initialize RateLimiter with all available keys
@@ -95,9 +100,9 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
 
         const { keyIndex, model: modelName } = available;
         const apiKey = API_KEYS[keyIndex];
-        const maskedKey = `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}`;
+        const maskedKey = `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)} `;
 
-        console.log(`[Diagram Service] REQUEST: Key #${keyIndex + 1} (${maskedKey}) | Model: ${modelName}`);
+        console.log(`[Diagram Service]REQUEST: Key #${keyIndex + 1} (${maskedKey}) | Model: ${modelName} `);
 
         try {
             const genAI = new GoogleGenerativeAI(apiKey);
