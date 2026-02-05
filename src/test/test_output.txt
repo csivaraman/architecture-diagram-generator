@@ -1,0 +1,54 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/chandrasekarsivaraman/Documents/Applications/architecture-diagram-generator[39m
+
+[90mstdout[2m | src/RateLimiter.test.js[2m > [22m[2mRateLimiter[2m > [22m[2mshould rotate keys when one is exhausted
+[22m[39mReported quota exceeded for Key 1 on gemini-2.5-flash-lite. Marking as exhausted for today.
+
+[90mstdout[2m | src/RateLimiter.test.js[2m > [22m[2mRateLimiter[2m > [22m[2mshould rotate keys when one is exhausted
+[22m[39mReported quota exceeded for Key 1 on gemini-3-flash-preview. Marking as exhausted for today.
+Reported quota exceeded for Key 1 on gemini-2.5-flash-lite. Marking as exhausted for today.
+Reported quota exceeded for Key 1 on gemini-2.0-flash-lite. Marking as exhausted for today.
+Reported quota exceeded for Key 1 on gemini-flash-lite-latest. Marking as exhausted for today.
+Reported quota exceeded for Key 1 on gemini-2.5-flash. Marking as exhausted for today.
+
+[90mstdout[2m | src/RateLimiter.test.js[2m > [22m[2mRateLimiter[2m > [22m[2mshould reset counters periodically (simulated)
+[22m[39mInit lastResetDay: 2026-02-04T05:00:00.000Z
+Current time: 2026-02-04T15:30:12.646Z
+Post-reset lastResetDay: 2026-02-04T05:00:00.000Z
+Daily Count: [33m1[39m
+
+ [31m❯[39m src/RateLimiter.test.js [2m([22m[2m6 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 20[2mms[22m[39m
+     [32m✓[39m should initialize with provided API keys[32m 4[2mms[22m[39m
+     [32m✓[39m should load stats from localStorage on initialization[32m 1[2mms[22m[39m
+     [32m✓[39m should return a valid key and model when available[32m 1[2mms[22m[39m
+     [32m✓[39m should rotate keys when one is exhausted[32m 3[2mms[22m[39m
+     [32m✓[39m should save stats to localStorage when usage changes[32m 1[2mms[22m[39m
+[31m     [31m×[31m should reset counters periodically (simulated)[39m[32m 8[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/RateLimiter.test.js[2m > [22mRateLimiter[2m > [22mshould reset counters periodically (simulated)
+[31m[1mAssertionError[22m: expected 1 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+[36m [2m❯[22m src/RateLimiter.test.js:[2m96:74[22m[39m
+    [90m 94| [39m        console.log('Daily Count:', rateLimiter.usage[0]['gemini-2.5-f…
+    [90m 95| [39m
+    [90m 96| [39m        expect(rateLimiter.usage[0]['gemini-2.5-flash-lite'].dailyCoun…
+    [90m   | [39m                                                                         [31m^[39m
+    [90m 97| [39m    })[33m;[39m
+    [90m 98| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 10:30:12
+[2m   Duration [22m 788ms[2m (transform 36ms, setup 68ms, import 30ms, tests 20ms, environment 514ms)[22m
+

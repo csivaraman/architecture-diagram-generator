@@ -1,6 +1,39 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const apiKey = "AIzaSyBhCqtzywlw3ldjgaWxfv0MjSUSpYMw8uo"; // .env.local key
+// --- Load .env.local manually ---
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.resolve(__dirname, '../../.env.local');
+
+if (fs.existsSync(envPath)) {
+    console.log(`Loading environment variables from ${envPath}`);
+    const envConfig = fs.readFileSync(envPath, 'utf-8');
+    envConfig.split('\n').forEach(line => {
+        const match = line.match(/^([^=]+)=(.*)$/);
+        if (match) {
+            const key = match[1].trim();
+            const value = match[2].trim().replace(/^['"]|['"]$/g, '');
+            process.env[key] = value;
+        }
+    });
+} else {
+    console.warn("⚠️ .env.local file not found.");
+}
+
+// Get the first available Gemini API key
+const apiKey = Object.keys(process.env)
+    .filter(key => key.startsWith('VITE_GEMINI_API_KEY_'))
+    .sort()
+    .map(key => process.env[key])
+    .find(Boolean);
+
+if (!apiKey) {
+    console.error("❌ No VITE_GEMINI_API_KEY_* found in environment.");
+    process.exit(1);
+}
+
 const genAI = new GoogleGenerativeAI(apiKey);
 
 async function testRefinement() {

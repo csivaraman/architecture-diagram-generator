@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 // --- Load .env.local manually (Zero-dependency approach) ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, '.env.local');
+const envPath = path.resolve(__dirname, '../../.env.local');
 
 if (fs.existsSync(envPath)) {
     console.log(`Loading environment variables from ${envPath}`);

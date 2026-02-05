@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Activity } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import RateLimiter from './RateLimiter';
+import TestRunner from './test/TestRunner.jsx';
 
 
 const RateLimitStatus = ({ stats }) => {
@@ -137,8 +138,11 @@ Your response must have this exact structure:
 
 Identify all major components, their relationships, and organize them into logical architectural layers. If the system has end users, web browsers, or mobile apps that interact with the system, include them as "user" type components in a "Client" layer at the top. Common layer names: Client (users, browsers, mobile apps), Presentation (frontend apps, UI), Application (backend services, APIs), Data (databases, caches), Infrastructure (queues, external services).`;
 
-    const generateDiagram = async () => {
-        if (!description) {
+    const generateDiagram = async (overrideDescription) => {
+        // Handle both event objects (from button click) and direct string input (from tests)
+        const descToUse = (typeof overrideDescription === 'string') ? overrideDescription : description;
+
+        if (!descToUse) {
             setError('Please provide a system description');
             return;
         }
@@ -156,17 +160,19 @@ Identify all major components, their relationships, and organize them into logic
         let retryCount = 0;
 
         // Keep track of current attempt details for error handling
+        let persistentAvailable = null;
         let currentKeyIndex = -1;
         let currentModelName = '';
 
         while (retryCount < MAX_RETRIES) {
             try {
                 // Estimate tokens (rough estimate: ~4 chars per token)
-                const promptText = SYSTEM_PROMPT + description;
+                const promptText = SYSTEM_PROMPT + descToUse;
                 const estimatedTokens = Math.ceil(promptText.length / 4) + 2000; // +2000 for response
 
-                // Get optimal key and model
-                const available = await rateLimiter.getKeyAndModel(estimatedTokens);
+                // Get optimal key and model (use previous if it was a 503 retry)
+                const available = persistentAvailable || await rateLimiter.getKeyAndModel(estimatedTokens);
+                persistentAvailable = null; // Clear it for next time
 
                 if (!available) {
                     throw new Error('Daily generation limit reached for all available free models. Please try again in 24 hours or provide your own API key in the configuration.');
@@ -192,7 +198,7 @@ Identify all major components, their relationships, and organize them into logic
                     contents: [{
                         role: 'user',
                         parts: [{
-                            text: `${SYSTEM_PROMPT}\n\nDescription: ${description}\n\nGenerate the architecture JSON.`
+                            text: `${SYSTEM_PROMPT}\n\nDescription: ${descToUse}\n\nGenerate the architecture JSON.`
                         }]
                     }]
                 });
@@ -235,8 +241,24 @@ Identify all major components, their relationships, and organize them into logic
             } catch (err) {
                 console.error(`Attempt ${retryCount + 1} failed:`, err);
 
-                // Check if it's a rate limit error
-                if (err.message && (err.message.includes('429') || err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+                // Handle 503 Model Overloaded specifically (Retry same key/model after 10s)
+                const errorMsg = err.message || '';
+                if (errorMsg.includes('503') || errorMsg.toLowerCase().includes('overloaded')) {
+                    retryCount++;
+                    if (retryCount < MAX_RETRIES) {
+                        console.log(`%c[GenAI Retry] Model overloaded (503). Retrying after 10s delay with Key ${currentKeyIndex + 1}...`, 'color: #f59e0b; font-weight: bold;');
+
+                        // Keep the same key and model for retry
+                        persistentAvailable = { keyIndex: currentKeyIndex, model: currentModelName };
+
+                        // Wait 10 seconds as requested
+                        await new Promise(resolve => setTimeout(resolve, 10000));
+                        continue;
+                    }
+                }
+
+                // Check if it's a rate limit error (429)
+                if (errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
                     // Critical: Report this to the rate limiter so it doesn't give us the same key/model again
                     if (currentKeyIndex !== -1 && currentModelName) {
                         rateLimiter.reportQuotaExceeded(currentKeyIndex, currentModelName);
@@ -405,6 +427,11 @@ Identify all major components, their relationships, and organize them into logic
         `}
             </style>
 
+            {import.meta.env.DEV && (
+                <div className="test-section" style={{ maxWidth: '1400px', margin: '0 auto 2rem', padding: '0 1rem' }}>
+                    <TestRunner generateDiagram={generateDiagram} />
+                </div>
+            )}
             <div style={{ maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: isMobile ? '2rem' : '3rem', animation: 'fadeInUp 0.6s ease-out' }}>

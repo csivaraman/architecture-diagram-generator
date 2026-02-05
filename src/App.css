@@ -273,3 +273,45 @@
     height: 16px;
     border-radius: 4px;
 }
+
+/* test section */
+.test-runner {
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.test-progress {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+.test-results {
+    margin-top: 20px;
+}
+
+.results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.result-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    align-items: center;
+}
+
+.result-item.passed {
+    background: #e8f5e9;
+}
+
+.result-item.failed {
+    background: #ffebee;
+}
