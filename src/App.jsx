@@ -3,6 +3,7 @@ import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Act
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import RateLimiter from './RateLimiter';
 import TestRunner from './test/TestRunner.jsx';
+import { architectureTestCases } from './data/architectureTestCases';
 
 
 const RateLimitStatus = ({ stats }) => {
@@ -398,8 +399,14 @@ Identify all major components, their relationships, and organize them into logic
         }, 500);
     };
 
-    const loadExample = () => {
-        setDescription('A scalable e-commerce platform with microservices architecture. Users can browse products, add items to cart, and checkout. The system includes product catalog, user authentication, payment processing, order management, and inventory tracking. Uses React frontend, Node.js microservices, PostgreSQL for transactional data, Redis for caching, and RabbitMQ for async communication between services.');
+    const handleLoadExample = (e) => {
+        const testCaseId = e.target.value;
+        if (!testCaseId) return;
+
+        const testCase = architectureTestCases.find(tc => tc.id === testCaseId);
+        if (testCase) {
+            setDescription(testCase.description);
+        }
     };
 
     return (
@@ -487,15 +494,33 @@ Identify all major components, their relationships, and organize them into logic
                             )}
                         </button>
 
-                        <button
-                            onClick={loadExample}
+                        <select
+                            onChange={handleLoadExample}
                             disabled={loading}
-                            style={{ padding: '1rem 2rem', fontSize: '1rem', fontWeight: 600, color: '#667eea', background: 'white', border: '2px solid #667eea', borderRadius: '12px', cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
-                            onMouseOver={(e) => !loading && (e.target.style.background = '#f3f4f6')}
-                            onMouseOut={(e) => e.target.style.background = 'white'}
+                            className="load-example-select"
+                            defaultValue=""
+                            style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '1rem',
+                                fontWeight: 600,
+                                color: '#667eea',
+                                background: 'white',
+                                border: '2px solid #667eea',
+                                borderRadius: '12px',
+                                cursor: loading ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s',
+                                appearance: 'none',
+                                textAlign: 'center',
+                                minWidth: '240px'
+                            }}
                         >
-                            Load Example
-                        </button>
+                            <option value="" disabled>Load Example System...</option>
+                            {architectureTestCases.map(tc => (
+                                <option key={tc.id} value={tc.id}>
+                                    {tc.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
                     {error && (
