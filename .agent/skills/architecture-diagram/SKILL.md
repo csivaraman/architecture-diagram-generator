@@ -86,6 +86,12 @@ Identify all major components, their relationships, and organize them into logic
 - White card-based layout
 - Smooth animations
 - Loading states during generation
+- **Professional Connector Routing**:
+  - Use straight orthogonal lines (no diagonals)
+  - Horizontal/Vertical segments with 90-degree bends
+  - Proper component alignment to minimize crossings
+  - Logical entry/exit points (top/bottom/sides)
+  - Adequate spacing between all elements
 
 ### NO Environment Variables Needed
 - No .env.local file

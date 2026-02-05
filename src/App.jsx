@@ -287,30 +287,57 @@ Identify all major components, their relationships, and organize them into logic
     const layoutDiagram = (architecture, systemName) => {
         const COMPONENT_WIDTH = isMobile ? 140 : (isTablet ? 160 : 180);
         const COMPONENT_HEIGHT = isMobile ? 70 : 80;
-        const COMPONENT_GAP_X = isMobile ? 30 : (isTablet ? 45 : 60);
-        const LAYER_HEIGHT = isMobile ? 180 : 200;
-        const PADDING_TOP = isMobile ? 20 : 40;
-        const PADDING_SIDE = isMobile ? 20 : (isTablet ? 40 : 80);
-        const LAYER_LABEL_HEIGHT = 40;
+        const COMPONENT_GAP_X = isMobile ? 40 : (isTablet ? 60 : 80);
+        const LAYER_HEIGHT = isMobile ? 200 : 250;
+        const PADDING_TOP = isMobile ? 40 : 60;
+        const PADDING_SIDE = isMobile ? 40 : (isTablet ? 60 : 100);
+        const LAYER_LABEL_HEIGHT = 50;
 
-        // 1. Calculate Dynamic Canvas Width
+        // 1. Sort components in layers to minimize crossings
+        const layerSortedComponentIds = [];
+        architecture.layers.forEach((layer, layerIdx) => {
+            if (layerIdx === 0) {
+                layerSortedComponentIds.push(layer.componentIds);
+            } else {
+                const prevLayerIds = layerSortedComponentIds[layerIdx - 1];
+                // Simple heuristic: sort by average index of connected components in the previous layer
+                const sortedIds = [...layer.componentIds].sort((a, b) => {
+                    const getAvgPos = (compId) => {
+                        const connections = architecture.connections.filter(c =>
+                            (c.from === compId && prevLayerIds.includes(c.to)) ||
+                            (c.to === compId && prevLayerIds.includes(c.from))
+                        );
+                        if (connections.length === 0) return prevLayerIds.length / 2;
+                        const sum = connections.reduce((acc, c) => {
+                            const otherId = c.from === compId ? c.to : c.from;
+                            return acc + prevLayerIds.indexOf(otherId);
+                        }, 0);
+                        return sum / connections.length;
+                    };
+                    return getAvgPos(a) - getAvgPos(b);
+                });
+                layerSortedComponentIds.push(sortedIds);
+            }
+        });
+
+        // 2. Calculate Dynamic Canvas Width
         let maxComponentsInLayer = 0;
-        architecture.layers.forEach(layer => {
-            maxComponentsInLayer = Math.max(maxComponentsInLayer, layer.componentIds.length);
+        layerSortedComponentIds.forEach(ids => {
+            maxComponentsInLayer = Math.max(maxComponentsInLayer, ids.length);
         });
 
         const calculatedWidth = (maxComponentsInLayer * (COMPONENT_WIDTH + COMPONENT_GAP_X)) + (PADDING_SIDE * 2);
         const width = Math.max(isMobile ? 350 : 1200, calculatedWidth);
-        const height = PADDING_TOP + (architecture.layers.length * LAYER_HEIGHT);
+        const height = PADDING_TOP + (architecture.layers.length * LAYER_HEIGHT) + 40;
 
         const components = architecture.components.map(comp => {
             const layerIndex = architecture.layers.findIndex(layer =>
                 layer.componentIds.includes(comp.id)
             );
 
-            const layer = architecture.layers[layerIndex] || architecture.layers[0];
-            const componentsInLayer = layer.componentIds.length;
-            const indexInLayer = layer.componentIds.indexOf(comp.id);
+            const sortedIds = layerSortedComponentIds[layerIndex] || architecture.layers[layerIndex]?.componentIds || [];
+            const componentsInLayer = sortedIds.length;
+            const indexInLayer = sortedIds.indexOf(comp.id);
 
             // Center components in the layer
             const totalLayerContentWidth = componentsInLayer * COMPONENT_WIDTH + (componentsInLayer - 1) * COMPONENT_GAP_X;
@@ -321,7 +348,8 @@ Identify all major components, their relationships, and organize them into logic
                 x: startX + indexInLayer * (COMPONENT_WIDTH + COMPONENT_GAP_X) + COMPONENT_WIDTH / 2,
                 y: PADDING_TOP + (layerIndex * LAYER_HEIGHT) + LAYER_LABEL_HEIGHT + (LAYER_HEIGHT - LAYER_LABEL_HEIGHT) / 2,
                 width: COMPONENT_WIDTH,
-                height: COMPONENT_HEIGHT
+                height: COMPONENT_HEIGHT,
+                layerIndex
             };
         });
 
@@ -427,11 +455,22 @@ Identify all major components, their relationships, and organize them into logic
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
           }
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-          }
-        `}
+            @keyframes pulse {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.6; }
+            }
+            @keyframes flow {
+              from { stroke-dashoffset: 20; }
+              to { stroke-dashoffset: 0; }
+            }
+            .connector-path {
+              transition: stroke 0.3s, stroke-width 0.3s;
+            }
+            .connector-path:hover {
+              stroke-width: 3;
+              filter: url(#glow);
+            }
+          `}
             </style>
 
             {import.meta.env.DEV && (
@@ -607,11 +646,21 @@ Identify all major components, their relationships, and organize them into logic
                                 })}
 
                                 <defs>
-                                    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                                        <polygon points="0 0, 10 3, 0 6" fill="#64748b" />
+                                    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                                        <path d="M 0 0 L 8 4 L 0 8 Z" fill="#94a3b8" />
+                                    </marker>
+                                    <marker id="arrowhead-active" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                                        <path d="M 0 0 L 8 4 L 0 8 Z" fill="#667eea" />
                                     </marker>
                                     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
                                         <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.1" />
+                                    </filter>
+                                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                                        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                                        <feMerge>
+                                            <feMergeNode in="coloredBlur" />
+                                            <feMergeNode in="SourceGraphic" />
+                                        </feMerge>
                                     </filter>
                                 </defs>
 
@@ -620,30 +669,68 @@ Identify all major components, their relationships, and organize them into logic
                                     const toComp = diagram.components.find(c => c.id === conn.to);
                                     if (!fromComp || !toComp) return null;
 
-                                    const x1 = fromComp.x;
-                                    const y1 = fromComp.y + fromComp.height / 2;
-                                    const x2 = toComp.x;
-                                    const y2 = toComp.y - toComp.height / 2;
+                                    const isDownward = fromComp.y < toComp.y;
+                                    const isUpward = fromComp.y > toComp.y;
+                                    const isSameLayer = Math.abs(fromComp.y - toComp.y) < 10;
 
-                                    // Jitter midY based on index to separate parallel lines
-                                    // Also account for the gap between layers
-                                    const baseMidY = (y1 + y2) / 2;
-                                    const jitter = (idx % 5 - 2) * 20; // -40, -20, 0, 20, 40 offset
-                                    const midY = baseMidY + jitter;
+                                    let x1, y1, x2, y2, pathData, midY;
 
-                                    // Stagger labels horizontally to avoid stacking
-                                    const labelX = (x1 + x2) / 2 + ((idx % 3 - 1) * 60);
+                                    if (isSameLayer) {
+                                        // Side-to-side orthogonal routing
+                                        const fromLeft = fromComp.x < toComp.x;
+                                        x1 = fromComp.x + (fromLeft ? fromComp.width / 2 : -fromComp.width / 2);
+                                        y1 = fromComp.y;
+                                        x2 = toComp.x + (fromLeft ? -toComp.width / 2 : toComp.width / 2);
+                                        y2 = toComp.y;
+
+                                        const bendX = fromLeft ? Math.max(x1 + 20, (x1 + x2) / 2) : Math.min(x1 - 20, (x1 + x2) / 2);
+                                        const bendY = y1 + 40 + (idx % 3) * 15;
+                                        pathData = `M ${x1} ${y1} H ${bendX} V ${bendY} H ${x2} V ${y2}`;
+                                        midY = bendY;
+                                    } else {
+                                        // Vertical orthogonal routing
+                                        x1 = fromComp.x;
+                                        y1 = fromComp.y + (isDownward ? fromComp.height / 2 : -fromComp.height / 2);
+                                        x2 = toComp.x;
+                                        y2 = toComp.y + (isDownward ? -toComp.height / 2 : toComp.height / 2);
+
+                                        // Adjust x position slightly to avoid overlapping lines
+                                        const xOffset = (idx % 7 - 3) * 12;
+                                        const adjustedX1 = x1 + xOffset;
+                                        const adjustedX2 = x2 + xOffset;
+
+                                        const verticalGap = (y2 - y1);
+                                        const midYOffset = (idx % 5 - 2) * 15;
+                                        midY = y1 + verticalGap / 2 + midYOffset;
+
+                                        pathData = `M ${x1} ${y1} V ${midY} H ${x2} V ${y2}`;
+                                    }
+
+                                    const labelX = (x1 + x2) / 2;
+                                    const isAsync = conn.type === 'async';
+                                    const strokeColor = isAsync ? '#94a3b8' : '#64748b';
 
                                     return (
                                         <g key={idx}>
                                             <path
-                                                d={`M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`}
-                                                stroke="#64748b"
-                                                strokeWidth="1.5"
+                                                d={pathData}
+                                                stroke={isAsync ? 'rgba(148, 163, 184, 0.1)' : 'rgba(102, 126, 234, 0.1)'}
+                                                strokeWidth="8"
                                                 fill="none"
-                                                markerEnd="url(#arrowhead)"
-                                                strokeDasharray={conn.type === 'async' ? '5,5' : '0'}
-                                                style={{ opacity: 0.6 }}
+                                                className="connector-glow"
+                                                style={{ opacity: 0, transition: 'opacity 0.3s' }}
+                                            />
+                                            <path
+                                                className="connector-path"
+                                                d={pathData}
+                                                stroke={strokeColor}
+                                                strokeWidth="2"
+                                                fill="none"
+                                                markerEnd={`url(#${isAsync ? 'arrowhead' : 'arrowhead-active'})`}
+                                                strokeDasharray={isAsync ? '6,4' : 'none'}
+                                                style={{
+                                                    opacity: 0.8,
+                                                }}
                                             />
                                             <g transform={`translate(${labelX}, ${midY})`}>
                                                 <rect
@@ -653,14 +740,14 @@ Identify all major components, their relationships, and organize them into logic
                                                     height="20"
                                                     fill="white"
                                                     rx="4"
-                                                    stroke="#e2e8f0"
+                                                    stroke={isAsync ? '#e2e8f0' : '#dbeafe'}
                                                     strokeWidth="1"
-                                                    style={{ opacity: 0.9 }}
+                                                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.05))' }}
                                                 />
                                                 <text
                                                     fontSize="9"
                                                     fontWeight="600"
-                                                    fill="#475569"
+                                                    fill={isAsync ? '#64748b' : '#3b82f6'}
                                                     textAnchor="middle"
                                                     alignmentBaseline="central"
                                                     style={{ pointerEvents: 'none' }}
