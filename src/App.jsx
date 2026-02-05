@@ -88,7 +88,8 @@ const ArchitectureDiagramGenerator = () => {
         const COMPONENT_HEIGHT = isMobile ? 70 : 80;
         const COMPONENT_GAP_X = isMobile ? 40 : (isTablet ? 60 : 80);
         const LAYER_HEIGHT = isMobile ? 200 : 250;
-        const PADDING_TOP = isMobile ? 40 : 60;
+        const TITLE_SPACE = 50;
+        const PADDING_TOP = (isMobile ? 40 : 60) + TITLE_SPACE;
         const PADDING_SIDE = isMobile ? 40 : (isTablet ? 60 : 100);
         const LAYER_LABEL_HEIGHT = 50;
 
@@ -374,23 +375,15 @@ const ArchitectureDiagramGenerator = () => {
                     <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1rem' : '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
                         <div style={{
                             display: 'flex',
-                            justifyContent: 'center',
+                            justifyContent: 'flex-end',
                             alignItems: 'center',
-                            marginBottom: '1.5rem',
+                            marginBottom: '1rem',
                             paddingBottom: '1rem',
-                            borderBottom: '2px solid #f3f4f6',
-                            flexDirection: isMobile ? 'column' : 'row',
-                            position: 'relative',
-                            gap: '1rem'
+                            borderBottom: '2px solid #f3f4f6'
                         }}>
-                            <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.75rem', fontWeight: 700, color: '#1f2937', margin: 0, textAlign: 'center' }}>
-                                {diagram.systemName}
-                            </h2>
                             <div style={{
                                 display: 'flex',
-                                gap: '0.5rem',
-                                position: isMobile ? 'static' : 'absolute',
-                                right: isMobile ? 'auto' : 0
+                                gap: '0.5rem'
                             }}>
                                 <button onClick={() => setZoom(Math.min(zoom + 0.2, 3))} style={{ padding: '0.5rem', background: '#f3f4f6', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
                                     <ZoomIn size={20} />
@@ -415,6 +408,17 @@ const ArchitectureDiagramGenerator = () => {
                                 style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.2s' }}
                             >
                                 <rect width={diagram.width} height={diagram.height} fill="white" />
+                                <text
+                                    x={diagram.width / 2}
+                                    y={50}
+                                    fontSize={isMobile ? "20" : "24"}
+                                    fontWeight="bold"
+                                    fill="#1f2937"
+                                    textAnchor="middle"
+                                    style={{ textTransform: 'uppercase', letterSpacing: '1px' }}
+                                >
+                                    {diagram.systemName}
+                                </text>
 
                                 {diagram.layers.map((layer, idx) => {
                                     const layerTop = diagram.paddingTop + (idx * diagram.layerHeight);
