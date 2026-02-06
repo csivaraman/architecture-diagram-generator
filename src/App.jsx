@@ -131,6 +131,42 @@ const ArchitectureDiagramGenerator = () => {
             architecture.layers[targetLayerIndex].componentIds.push(...orphanedComponents.map(c => c.id));
         }
 
+        // 0.1 Pre-processing: Heal isolated components (No connections)
+        // Check if any specific component has 0 connections
+        architecture.components.forEach(comp => {
+            const hasConnection = architecture.connections.some(conn => conn.from === comp.id || conn.to === comp.id);
+            if (!hasConnection) {
+                console.warn(`[Layout] Component ${comp.id} is isolated. Healing connection...`);
+
+                // Heuristic: Connect to "API Gateway" or "Hub" (most connected node)
+                let targetId = null;
+
+                // Priority 1: API Gateway
+                const gateway = architecture.components.find(c => c.name.toLowerCase().includes('gateway') || c.name.toLowerCase().includes('api'));
+                if (gateway && gateway.id !== comp.id) {
+                    targetId = gateway.id;
+                } else {
+                    // Priority 2: Find the 'Hub' (max connections)
+                    const connectionCounts = {};
+                    architecture.connections.forEach(c => {
+                        connectionCounts[c.from] = (connectionCounts[c.from] || 0) + 1;
+                        connectionCounts[c.to] = (connectionCounts[c.to] || 0) + 1;
+                    });
+
+                    targetId = Object.keys(connectionCounts).reduce((a, b) => connectionCounts[a] > connectionCounts[b] ? a : b, null);
+                }
+
+                if (targetId) {
+                    architecture.connections.push({
+                        from: targetId,
+                        to: comp.id,
+                        label: 'Inferred',
+                        type: 'sync'
+                    });
+                }
+            }
+        });
+
         // 1. Sort components in layers to minimize crossings
         const layerSortedComponentIds = [];
         architecture.layers.forEach((layer, layerIdx) => {
