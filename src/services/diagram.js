@@ -117,14 +117,18 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
                     result = await model.generateContent(prompt);
                     break; // Success
                 } catch (reqErr) {
-                    const msg = reqErr.message || '';
+                    const msg = (reqErr.message || '') + (reqErr.toString() || '');
                     const isOverloaded = msg.includes('503') || msg.includes('overloaded') || msg.includes('Service Unavailable');
 
-                    if (isOverloaded && retryCount < MAX_RETRIES) {
-                        console.warn(`[Diagram Service] Model Overloaded (503). Waiting 10s before retrying with same key...`);
-                        await new Promise(resolve => setTimeout(resolve, 10000));
-                        retryCount++;
-                        continue;
+                    if (isOverloaded) {
+                        if (retryCount < MAX_RETRIES) {
+                            console.warn(`[Diagram Service] ⚠️ Model Overloaded (503). Waiting 10s before retrying with same key (Attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+                            await new Promise(resolve => setTimeout(resolve, 10000));
+                            retryCount++;
+                            continue;
+                        } else {
+                            console.error(`[Diagram Service] ❌ Model Overloaded (503) after ${MAX_RETRIES} retries. Giving up.`);
+                        }
                     }
                     throw reqErr; // Re-throw if not 503 or max retries reached
                 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle } from 'lucide-react';
+import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
 
@@ -11,6 +11,7 @@ const ArchitectureDiagramGenerator = () => {
     const [diagram, setDiagram] = useState(null);
     const [zoom, setZoom] = useState(1);
     const [error, setError] = useState(null);
+    const [quotaError, setQuotaError] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
 
@@ -78,7 +79,27 @@ const ArchitectureDiagramGenerator = () => {
 
         } catch (err) {
             console.error('[Frontend] Generation Error:', err);
-            setError(`Failed to generate diagram: ${err.message}`);
+            const msg = err.message || '';
+
+            // Format generic error message for UI
+            let paramsDisplay = msg;
+
+            // Extract inner message if available (e.g., [503 ...])
+            const innerMatch = msg.match(/\[.*?\]\s*(.*)/);
+            if (innerMatch && innerMatch[1]) {
+                paramsDisplay = innerMatch[1].trim();
+            }
+
+            // Custom override for 503 Overloaded
+            if (msg.includes('The model is overloaded. Please try again later.')) {
+                paramsDisplay = "The model is overloaded. Please try again in 30 seconds.";
+            }
+
+            if (msg.includes('429') || msg.includes('quota') || msg.toLowerCase().includes('temporarily unavailable')) {
+                setQuotaError(true);
+            } else {
+                setError(`Failed to generate diagram: ${paramsDisplay}`);
+            }
             setLoading(false);
         }
     };
@@ -92,6 +113,23 @@ const ArchitectureDiagramGenerator = () => {
         const PADDING_TOP = (isMobile ? 40 : 60) + TITLE_SPACE;
         const PADDING_SIDE = isMobile ? 40 : (isTablet ? 60 : 100);
         const LAYER_LABEL_HEIGHT = 50;
+
+        // 0. Pre-processing: Heal orphaned components (fix ID mismatches)
+        // Find components that exist in 'components' but are missing from all 'layers'
+        const allLayerComponentIds = new Set(architecture.layers.flatMap(l => l.componentIds));
+        const orphanedComponents = architecture.components.filter(c => !allLayerComponentIds.has(c.id));
+
+        if (orphanedComponents.length > 0) {
+            console.warn(`[Layout] Found ${orphanedComponents.length} orphaned components. Healing...`, orphanedComponents);
+
+            // Default to 'Application' layer (usually index 1) or the largest layer
+            let targetLayerIndex = architecture.layers.findIndex(l => l.name.toLowerCase().includes('application'));
+            if (targetLayerIndex === -1) targetLayerIndex = 1; // Fallback to 2nd layer
+            if (targetLayerIndex >= architecture.layers.length) targetLayerIndex = 0; // Absolute fallback
+
+            // Add orphans to the target layer
+            architecture.layers[targetLayerIndex].componentIds.push(...orphanedComponents.map(c => c.id));
+        }
 
         // 1. Sort components in layers to minimize crossings
         const layerSortedComponentIds = [];
@@ -294,8 +332,29 @@ const ArchitectureDiagramGenerator = () => {
 
 
 
-                {/* Input Form */}
                 <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1.5rem' : '2.5rem', marginBottom: '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', animation: 'fadeInUp 0.6s ease-out 0.1s both' }}>
+
+                    {/* AI Accuracy Disclaimer */}
+                    <div style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '12px',
+                        padding: '1rem',
+                        marginBottom: '1.5rem',
+                        display: 'flex',
+                        gap: '0.75rem',
+                        alignItems: 'start'
+                    }}>
+                        <Info size={20} color="#1d4ed8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <div>
+                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#1e40af', fontWeight: 500 }}>
+                                AI-generated diagrams may contain errors or inaccuracies.
+                            </p>
+                            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#3b82f6' }}>
+                                Please review and verify all outputs before use in production environments.
+                            </p>
+                        </div>
+                    </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
@@ -626,6 +685,50 @@ const ArchitectureDiagramGenerator = () => {
                     Powered by Google Gemini • Prototyped with Antigravity
                 </div>
             </div>
+
+            {/* API Quota Toast */}
+            {quotaError && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '24px',
+                    right: '24px',
+                    maxWidth: '400px',
+                    background: 'white',
+                    padding: '1.25rem',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+                    borderLeft: '6px solid #ef4444',
+                    display: 'flex',
+                    gap: '1rem',
+                    alignItems: 'start',
+                    zIndex: 1000,
+                    animation: 'fadeInUp 0.3s ease-out'
+                }}>
+                    <AlertTriangle size={24} color="#ef4444" style={{ flexShrink: 0 }} />
+                    <div>
+                        <h4 style={{ margin: '0 0 0.25rem', color: '#1f2937', fontSize: '1rem', fontWeight: 700 }}>API Quota Exceeded</h4>
+                        <p style={{ margin: 0, color: '#4b5563', fontSize: '0.9rem', lineHeight: '1.4' }}>
+                            This service uses free-tier Gemini API with daily limits. Service may be temporarily unavailable. Please try again later.
+                        </p>
+                        <button
+                            onClick={() => setQuotaError(false)}
+                            style={{
+                                display: 'block',
+                                marginTop: '0.75rem',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#ef4444',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                padding: 0
+                            }}
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* <RateLimitStatus stats={stats} /> */}
         </div >
