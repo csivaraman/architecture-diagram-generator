@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Info, AlertTriangle, Linkedin } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
 
@@ -797,6 +798,7 @@ const ArchitectureDiagramGenerator = () => {
             )}
 
             {/* <RateLimitStatus stats={stats} /> */}
+            <SpeedInsights />
         </div >
     );
 };
