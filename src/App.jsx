@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Info, AlertTriangle, Linkedin } from 'lucide-react';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
 
@@ -717,8 +717,38 @@ const ArchitectureDiagramGenerator = () => {
                 )}
 
                 {/* Footer Note */}
-                <div style={{ marginTop: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
-                    Powered by Google Gemini • Prototyped with Antigravity
+                <div style={{ marginTop: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', paddingBottom: '2rem' }}>
+                    <p style={{ marginBottom: '1rem', opacity: 0.8 }}>Powered by Google Gemini • Prototyped with Antigravity</p>
+
+                    <a
+                        href="https://www.linkedin.com/in/csivaraman/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            color: 'white',
+                            textDecoration: 'none',
+                            fontWeight: 500,
+                            padding: '0.5rem 1.25rem',
+                            background: 'rgba(255,255,255,0.1)',
+                            borderRadius: '9999px',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        <span>Built by Chandrasekar Sivaraman</span>
+                        <Linkedin size={16} style={{ marginTop: '-1px' }} />
+                    </a>
                 </div>
             </div>
 
