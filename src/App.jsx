@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Info, AlertTriangle, Linkedin } from 'lucide-react';
+import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Info, AlertTriangle, Linkedin, Edit } from 'lucide-react';
+import { openInDrawioWithLocalStorage } from './utils/drawioIntegration';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
 
@@ -489,6 +490,10 @@ const ArchitectureDiagramGenerator = () => {
                                 <button onClick={downloadSVG} style={{ padding: '0.5rem 1rem', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
                                     <Download size={20} />
                                     Download SVG
+                                </button>
+                                <button onClick={() => openInDrawioWithLocalStorage(diagram)} style={{ padding: '0.5rem 1rem', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+                                    <Edit size={20} />
+                                    Edit in Draw.io
                                 </button>
                             </div>
                         </div>
