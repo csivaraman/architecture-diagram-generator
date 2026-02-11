@@ -122,3 +122,4 @@ dist
 
 # Rate Limiter Stats
 rate_limiter_stats.json
+rate_limiter_stats_groq.json

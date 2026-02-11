@@ -3,44 +3,53 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORAGE_PATH = path.join(__dirname, '../../rate_limiter_stats.json');
+
+
 
 /**
  * Intelligent Rate Limiter for Gemini API Free Tier (Node.js Version)
  */
 class RateLimiter {
-    constructor(apiKeys) {
+    constructor(apiKeys, modelConfig = null, storageFilename = 'rate_limiter_stats.json') {
         this.apiKeys = apiKeys;
         this.currentKeyIndex = 0;
+        this.storagePath = path.join(__dirname, `../../${storageFilename}`);
 
-        // Priority order for models
-        this.modelPriority = [
-            'gemini-3-flash-preview',
-            'gemini-2.5-flash-lite',
-            'gemini-2.0-flash-lite',
-            'gemini-flash-lite-latest',
-            'gemini-2.5-flash',
-            'gemini-1.5-flash',
-            'gemini-1.5-pro'
-        ];
+        if (modelConfig) {
+            this.modelPriority = modelConfig.priority;
+            this.models = modelConfig.models;
+        } else {
+            // Priority order for models
+            this.modelPriority = [
+                'gemini-3-flash-preview',
+                'gemini-2.5-flash-lite',
+                'gemini-2.0-flash-lite',
+                'gemini-flash-lite-latest',
+                'gemini-2.5-flash',
+                'gemini-1.5-flash',
+                'gemini-1.5-pro'
+            ];
 
-        // Model configurations
-        this.models = {
-            'gemini-3-flash-preview': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' },
-            'gemini-2.5-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
-            'gemini-2.0-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
-            'gemini-flash-lite-latest': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
-            'gemini-2.5-flash': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' },
-            'gemini-1.5-flash': { rpm: 15, tpm: 1000000, rpd: 1500, quality: 'high' },
-            'gemini-1.5-pro': { rpm: 2, tpm: 32000, rpd: 50, quality: 'ultra' }
-        };
+            // Model configurations
+            this.models = {
+                'gemini-3-flash-preview': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' },
+                'gemini-2.5-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
+                'gemini-2.0-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
+                'gemini-flash-lite-latest': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
+                'gemini-2.5-flash': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' },
+                'gemini-1.5-flash': { rpm: 15, tpm: 1000000, rpd: 1500, quality: 'high' },
+                'gemini-1.5-pro': { rpm: 2, tpm: 32000, rpd: 50, quality: 'ultra' }
+            };
+        }
 
         this.SAFETY_FACTOR = 0.8;
         this.usage = {};
 
         // Initialize default usage
         apiKeys.forEach((_, keyIndex) => {
-            this.usage[keyIndex] = {};
+            if (!this.usage[keyIndex]) {
+                this.usage[keyIndex] = {};
+            }
             Object.keys(this.models).forEach(model => {
                 this.usage[keyIndex][model] = {
                     requestCount: 0,
@@ -57,8 +66,8 @@ class RateLimiter {
 
     _load() {
         try {
-            if (fs.existsSync(STORAGE_PATH)) {
-                const data = JSON.parse(fs.readFileSync(STORAGE_PATH, 'utf8'));
+            if (fs.existsSync(this.storagePath)) {
+                const data = JSON.parse(fs.readFileSync(this.storagePath, 'utf8'));
                 if (data.usage) {
                     // Restore usage if keys align
                     this.apiKeys.forEach((_, index) => {
@@ -86,7 +95,7 @@ class RateLimiter {
                 // as it won't persist across cold starts anyway.
                 return;
             }
-            fs.writeFileSync(STORAGE_PATH, JSON.stringify(data, null, 2));
+            fs.writeFileSync(this.storagePath, JSON.stringify(data, null, 2));
         } catch (e) {
             // Silently fail if FS is read-only
         }

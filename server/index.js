@@ -29,10 +29,10 @@ const validateDiagramRequest = (req, res, next) => {
  * Accepts systemDescription and returns generated diagram (with caching)
  */
 app.post('/api/generate-diagram', validateDiagramRequest, async (req, res) => {
-    const { systemDescription, instructions } = req.body;
+    const { systemDescription, instructions, provider } = req.body;
 
     try {
-        const result = await generateDiagram(systemDescription, instructions || '');
+        const result = await generateDiagram(systemDescription, instructions || '', provider);
         res.status(200).json(result);
     } catch (error) {
         res.status(500).json({

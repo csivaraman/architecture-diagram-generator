@@ -11,6 +11,7 @@ const ArchitectureDiagramGenerator = () => {
     const [loading, setLoading] = useState(false);
     const [diagram, setDiagram] = useState(null);
     const [zoom, setZoom] = useState(1);
+    const [provider, setProvider] = useState('gemini');
     const [error, setError] = useState(null);
     const [quotaError, setQuotaError] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -45,7 +46,7 @@ const ArchitectureDiagramGenerator = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ systemDescription: descToUse }),
+                body: JSON.stringify({ systemDescription: descToUse, provider }),
             });
 
             const result = await response.json();
@@ -58,11 +59,11 @@ const ArchitectureDiagramGenerator = () => {
             const fromCache = result.fromCache;
 
             if (fromCache) {
-                console.log('%c[Cache Hit] Received diagram from backend cache', 'color: #10b981; font-weight: bold;');
+                console.log(`%c[Cache Hit] Received diagram from backend cache for ${provider.toUpperCase()}`, 'color: #10b981; font-weight: bold;');
             } else {
-                const { keyId, model } = result.diagnostics || {};
+                const { keyId, model, provider: diagProvider } = result.diagnostics || {};
                 console.log(
-                    `%c[Service Request] Received fresh diagram from Gemini (Key #${keyId || '?'}, Model: ${model || 'unknown'})`,
+                    `%c[Service Request] Received fresh diagram from ${diagProvider ? diagProvider.toUpperCase() : provider.toUpperCase()} (Key #${keyId || '?'}, Model: ${model || 'unknown'})`,
                     'color: #3b82f6; font-weight: bold;'
                 );
             }
@@ -430,6 +431,29 @@ const ArchitectureDiagramGenerator = () => {
                         </button>
 
                         <select
+                            value={provider}
+                            onChange={(e) => setProvider(e.target.value)}
+                            disabled={loading}
+                            style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '1rem',
+                                fontWeight: 600,
+                                color: '#4b5563',
+                                background: 'white',
+                                border: '2px solid #e5e7eb',
+                                borderRadius: '12px',
+                                cursor: loading ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s',
+                                appearance: 'none',
+                                textAlign: 'center',
+                                minWidth: '180px'
+                            }}
+                        >
+                            <option value="gemini">Google Gemini</option>
+                            <option value="groq">Groq Llama</option>
+                        </select>
+
+                        <select
                             onChange={handleLoadExample}
                             disabled={loading}
                             className="load-example-select"
@@ -723,7 +747,6 @@ const ArchitectureDiagramGenerator = () => {
 
                 {/* Footer Note */}
                 <div style={{ marginTop: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', paddingBottom: '2rem' }}>
-                    <p style={{ marginBottom: '1rem', opacity: 0.8 }}>Powered by Google Gemini • Prototyped with Antigravity</p>
 
                     <a
                         href="https://www.linkedin.com/in/csivaraman/"
