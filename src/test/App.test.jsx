@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import App from '../App';
 
+// Mock Lucide icons
 // Mock Lucide icons
 vi.mock('lucide-react', () => ({
     Loader2: () => <div data-testid="loader">Loading...</div>,
@@ -11,6 +13,10 @@ vi.mock('lucide-react', () => ({
     ZoomIn: () => <div data-testid="zoom-in" />,
     ZoomOut: () => <div data-testid="zoom-out" />,
     AlertCircle: () => <div data-testid="alert" />,
+    Info: () => <div data-testid="info" />,
+    AlertTriangle: () => <div data-testid="alert-triangle" />,
+    Linkedin: () => <div data-testid="linkedin" />,
+    Edit: () => <div data-testid="edit" />,
     Activity: () => <div data-testid="activity" />
 }));
 
@@ -52,11 +58,12 @@ describe('App Component', () => {
         expect(screen.getByText('Please provide a system description')).toBeInTheDocument();
     });
 
-    it('loads example when button is clicked', () => {
+    it('loads example when option is selected', async () => {
+        const user = userEvent.setup();
         render(<App />);
-        const exampleBtn = screen.getByText('Load Example');
-        fireEvent.click(exampleBtn);
+        const exampleSelect = screen.getByTestId('load-example-select');
+        await user.selectOptions(exampleSelect, 'TC026');
         const input = screen.getByPlaceholderText(/Describe your system architecture/i);
-        expect(input.value).toContain('scalable e-commerce platform');
+        await waitFor(() => expect(input.value).toContain('scalable e-commerce platform'));
     });
 });

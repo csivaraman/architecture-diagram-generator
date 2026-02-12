@@ -1,9 +1,8 @@
 
 import { convertToDrawioXml } from '../utils/drawioIntegration.js';
-import assert from 'node:assert';
-import test from 'node:test';
+import { test, expect } from 'vitest';
 
-test('convertToDrawioXml generates valid XML structure', (t) => {
+test('convertToDrawioXml generates valid XML structure', () => {
     const mockDiagram = {
         systemName: 'Test System',
         components: [
@@ -27,28 +26,28 @@ test('convertToDrawioXml generates valid XML structure', (t) => {
     const xml = convertToDrawioXml(mockDiagram);
 
     // Basic checks
-    assert.ok(xml.includes('<mxfile host="app.diagrams.net"'), 'Missing mxfile wrapper');
-    assert.ok(xml.includes('<diagram name="Page-1"'), 'Missing diagram wrapper');
-    assert.ok(xml.includes('<mxGraphModel'), 'Missing mxGraphModel');
+    expect(xml).toContain('<mxfile host="app.diagrams.net"');
+    expect(xml).toContain('<diagram name="Page-1"');
+    expect(xml).toContain('<mxGraphModel');
 
     // Component checks
-    assert.ok(xml.includes('value="Frontend"'), 'Missing Frontend component');
-    assert.ok(xml.includes('style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontColor=#1e40af;"'), 'Missing Frontend style');
-    assert.ok(xml.includes('x="40"'), 'Incorrect X calculation (100 - 60)');
-    assert.ok(xml.includes('y="70"'), 'Incorrect Y calculation (100 - 30)');
+    expect(xml).toContain('value="Frontend"');
+    expect(xml).toContain('style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontColor=#1e40af;"');
+    expect(xml).toContain('x="40"');
+    expect(xml).toContain('y="70"');
 
     // Connection checks
-    assert.ok(xml.includes('value="HTTP"'), 'Missing connection label');
-    assert.ok(xml.includes('source="c1" target="c2"'), 'Missing connection source/target');
+    expect(xml).toContain('value="HTTP"');
+    expect(xml).toContain('source="c1" target="c2"');
 
     // Layer checks
-    assert.ok(xml.includes('value="Presentation LAYER"'), 'Missing Presentation layer');
-    assert.ok(xml.includes('style="whiteSpace=wrap;html=1;fillColor=#f8fafc;'), 'Missing layer style');
+    expect(xml).toContain('value="Presentation LAYER"');
+    expect(xml).toContain('style="whiteSpace=wrap;html=1;fillColor=#f8fafc;');
 
     // Shape checks
     // Database (capitalized input) should become cylinder
-    assert.ok(xml.includes('shape=cylinder3'), 'Missing database cylinder shape (case sensitivity check)');
+    expect(xml).toContain('shape=cylinder3');
 
     // User should become actor
-    assert.ok(xml.includes('shape=actor'), 'Missing user actor shape');
+    expect(xml).toContain('shape=actor');
 });
