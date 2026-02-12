@@ -572,120 +572,472 @@ const ArchitectureDiagramGenerator = () => {
                                     );
                                 })}
 
-                                <defs>
-                                    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-                                        <path d="M 0 0 L 8 4 L 0 8 Z" fill="#94a3b8" />
-                                    </marker>
-                                    <marker id="arrowhead-active" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-                                        <path d="M 0 0 L 8 4 L 0 8 Z" fill="#667eea" />
-                                    </marker>
-                                    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                                        <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.1" />
-                                    </filter>
-                                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                                        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                                        <feMerge>
-                                            <feMergeNode in="coloredBlur" />
-                                            <feMergeNode in="SourceGraphic" />
-                                        </feMerge>
-                                    </filter>
-                                </defs>
 
-                                {diagram.connections.map((conn, idx) => {
-                                    const fromComp = diagram.components.find(c => c.id === conn.from);
-                                    const toComp = diagram.components.find(c => c.id === conn.to);
-                                    if (!fromComp || !toComp) return null;
+<defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <path d="M 0 0 L 10 3.5 L 0 7 Z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <path d="M 0 0 L 10 3.5 L 0 7 Z" fill="#667eea" />
+    </marker>
+    <marker id="arrowhead-start" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto-start-reverse">
+        <path d="M 10 0 L 0 3.5 L 10 7 Z" fill="#64748b" />
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="2" dy="4" stdDeviation="4" floodOpacity="0.15" />
+    </filter>
+</defs>
 
-                                    const isDownward = fromComp.y < toComp.y;
-                                    const isUpward = fromComp.y > toComp.y;
-                                    const isSameLayer = Math.abs(fromComp.y - toComp.y) < 10;
+{
+    (() => {
+        // ✅ Pre-calculate connection point distribution for all components
+        const connectionPoints = new Map();
 
-                                    let x1, y1, x2, y2, pathData, midY;
+        diagram.components.forEach(comp => {
+            connectionPoints.set(comp.id, {
+                top: [],
+                bottom: [],
+                left: [],
+                right: []
+            });
+        });
 
-                                    if (isSameLayer) {
-                                        // Side-to-side orthogonal routing
-                                        const fromLeft = fromComp.x < toComp.x;
-                                        x1 = fromComp.x + (fromLeft ? fromComp.width / 2 : -fromComp.width / 2);
-                                        y1 = fromComp.y;
-                                        x2 = toComp.x + (fromLeft ? -toComp.width / 2 : toComp.width / 2);
-                                        y2 = toComp.y;
+        diagram.connections.forEach((conn, idx) => {
+            const fromComp = diagram.components.find(c => c.id === conn.from);
+            const toComp = diagram.components.find(c => c.id === conn.to);
+            if (!fromComp || !toComp) return;
 
-                                        const bendX = fromLeft ? Math.max(x1 + 20, (x1 + x2) / 2) : Math.min(x1 - 20, (x1 + x2) / 2);
-                                        const bendY = y1 + 40 + (idx % 3) * 15;
-                                        pathData = `M ${x1} ${y1} H ${bendX} V ${bendY} H ${x2} V ${y2}`;
-                                        midY = bendY;
-                                    } else {
-                                        // Vertical orthogonal routing
-                                        x1 = fromComp.x;
-                                        y1 = fromComp.y + (isDownward ? fromComp.height / 2 : -fromComp.height / 2);
-                                        x2 = toComp.x;
-                                        y2 = toComp.y + (isDownward ? -toComp.height / 2 : toComp.height / 2);
+            const dx = toComp.x - fromComp.x;
+            const dy = toComp.y - fromComp.y;
 
-                                        // Adjust x position slightly to avoid overlapping lines
-                                        const xOffset = (idx % 7 - 3) * 12;
-                                        const adjustedX1 = x1 + xOffset;
-                                        const adjustedX2 = x2 + xOffset;
+            let fromEdge, toEdge;
 
-                                        const verticalGap = (y2 - y1);
-                                        const midYOffset = (idx % 5 - 2) * 15;
-                                        midY = y1 + verticalGap / 2 + midYOffset;
+            if (Math.abs(dy) > Math.abs(dx)) {
+                if (dy > 0) {
+                    fromEdge = 'bottom';
+                    toEdge = 'top';
+                } else {
+                    fromEdge = 'top';
+                    toEdge = 'bottom';
+                }
+            } else {
+                if (dx > 0) {
+                    fromEdge = 'right';
+                    toEdge = 'left';
+                } else {
+                    fromEdge = 'left';
+                    toEdge = 'right';
+                }
+            }
 
-                                        pathData = `M ${x1} ${y1} V ${midY} H ${x2} V ${y2}`;
-                                    }
+            const fromPoints = connectionPoints.get(fromComp.id);
+            const toPoints = connectionPoints.get(toComp.id);
 
-                                    const labelX = (x1 + x2) / 2;
-                                    const isAsync = conn.type === 'async';
-                                    const strokeColor = isAsync ? '#94a3b8' : '#64748b';
+            if (fromPoints && fromPoints[fromEdge]) {
+                fromPoints[fromEdge].push({ connIdx: idx, direction: 'out' });
+            }
+            if (toPoints && toPoints[toEdge]) {
+                toPoints[toEdge].push({ connIdx: idx, direction: 'in' });
+            }
+        });
 
-                                    return (
-                                        <g key={idx}>
-                                            <path
-                                                d={pathData}
-                                                stroke={isAsync ? 'rgba(148, 163, 184, 0.1)' : 'rgba(102, 126, 234, 0.1)'}
-                                                strokeWidth="8"
-                                                fill="none"
-                                                className="connector-glow"
-                                                style={{ opacity: 0, transition: 'opacity 0.3s' }}
-                                            />
-                                            <path
-                                                className="connector-path"
-                                                d={pathData}
-                                                stroke={strokeColor}
-                                                strokeWidth="2"
-                                                fill="none"
-                                                markerEnd={`url(#${isAsync ? 'arrowhead' : 'arrowhead-active'})`}
-                                                strokeDasharray={isAsync ? '6,4' : 'none'}
-                                                style={{
-                                                    opacity: 0.8,
-                                                }}
-                                            />
-                                            <g transform={`translate(${labelX}, ${midY})`}>
-                                                <rect
-                                                    x="-40"
-                                                    y="-10"
-                                                    width="80"
-                                                    height="20"
-                                                    fill="white"
-                                                    rx="4"
-                                                    stroke={isAsync ? '#e2e8f0' : '#dbeafe'}
-                                                    strokeWidth="1"
-                                                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.05))' }}
-                                                />
-                                                <text
-                                                    fontSize="9"
-                                                    fontWeight="600"
-                                                    fill={isAsync ? '#64748b' : '#3b82f6'}
-                                                    textAnchor="middle"
-                                                    alignmentBaseline="central"
-                                                    style={{ pointerEvents: 'none' }}
-                                                >
-                                                    {conn.label}
-                                                </text>
-                                            </g>
-                                        </g>
-                                    );
-                                })}
+        // ✅ Calculate distributed points along edges
+        const getDistributedPoint = (comp, edge, index, total) => {
+            const EDGE_PADDING = 30;
 
+            if (total <= 1) {
+                switch (edge) {
+                    case 'top':
+                        return { x: comp.x, y: comp.y - comp.height / 2 };
+                    case 'bottom':
+                        return { x: comp.x, y: comp.y + comp.height / 2 };
+                    case 'left':
+                        return { x: comp.x - comp.width / 2, y: comp.y };
+                    case 'right':
+                        return { x: comp.x + comp.width / 2, y: comp.y };
+                }
+            }
+
+            if (edge === 'top' || edge === 'bottom') {
+                const availableWidth = comp.width - (2 * EDGE_PADDING);
+                const spacing = total > 1 ? availableWidth / (total - 1) : 0;
+                const startX = comp.x - comp.width / 2 + EDGE_PADDING;
+                const x = startX + (index * spacing);
+                const y = edge === 'top' ? comp.y - comp.height / 2 : comp.y + comp.height / 2;
+                return { x, y };
+            } else {
+                const availableHeight = comp.height - (2 * EDGE_PADDING);
+                const spacing = total > 1 ? availableHeight / (total - 1) : 0;
+                const startY = comp.y - comp.height / 2 + EDGE_PADDING;
+                const y = startY + (index * spacing);
+                const x = edge === 'left' ? comp.x - comp.width / 2 : comp.x + comp.width / 2;
+                return { x, y };
+            }
+        };
+
+        // ✅ Track placed labels to avoid overlaps
+        const placedLabels = [];
+
+        // ✅ Helper: Check if label collides with anything
+        const labelCollides = (x, y, width, height) => {
+            const labelBox = {
+                left: x - width / 2,
+                right: x + width / 2,
+                top: y - height / 2,
+                bottom: y + height / 2
+            };
+
+            // Check collision with components (with extra buffer)
+            for (const comp of diagram.components) {
+                const compBox = {
+                    left: comp.x - comp.width / 2 - 25, // Increased buffer
+                    right: comp.x + comp.width / 2 + 25,
+                    top: comp.y - comp.height / 2 - 25,
+                    bottom: comp.y + comp.height / 2 + 25
+                };
+
+                if (!(labelBox.right < compBox.left ||
+                    labelBox.left > compBox.right ||
+                    labelBox.bottom < compBox.top ||
+                    labelBox.top > compBox.bottom)) {
+                    return true;
+                }
+            }
+
+            // Check collision with other labels
+            for (const placed of placedLabels) {
+                if (!(labelBox.right < placed.left ||
+                    labelBox.left > placed.right ||
+                    labelBox.bottom < placed.top ||
+                    labelBox.top > placed.bottom)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        // ✅ Helper: Find longest segment away from endpoints
+        const findBestLabelPosition = (pathPoints) => {
+            if (pathPoints.length < 3) return null;
+
+            let longestSegment = { index: 0, length: 0 };
+
+            // Prefer segments that are not the first or last
+            for (let i = 1; i < pathPoints.length - 2; i++) {
+                const p1 = pathPoints[i];
+                const p2 = pathPoints[i + 1];
+                const length = Math.sqrt(
+                    Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+                );
+
+                if (length > longestSegment.length) {
+                    longestSegment = { index: i, length };
+                }
+            }
+
+            return longestSegment;
+        };
+
+        // ✅ Helper: Try multiple label positions
+        const findClearLabelPosition = (pathPoints, segmentIndex, labelWidth, labelHeight) => {
+            const p1 = pathPoints[segmentIndex];
+            const p2 = pathPoints[segmentIndex + 1];
+
+            // Try positions at 25%, 50%, and 75% of the segment
+            const candidatePoints = [
+                { x: (p1.x * 0.75 + p2.x * 0.25), y: (p1.y * 0.75 + p2.y * 0.25) },
+                { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
+                { x: (p1.x * 0.25 + p2.x * 0.75), y: (p1.y * 0.25 + p2.y * 0.75) }
+            ];
+
+            const isVertical = Math.abs(p1.x - p2.x) < 5;
+            const isHorizontal = Math.abs(p1.y - p2.y) < 5;
+
+            const positions = [];
+
+            for (const cp of candidatePoints) {
+                if (isHorizontal) {
+                    positions.push(
+                        { x: cp.x, y: cp.y - 35 },  // Above
+                        { x: cp.x, y: cp.y + 35 },  // Below
+                        { x: cp.x, y: cp.y - 50 },  // Further above
+                        { x: cp.x, y: cp.y + 50 }   // Further below
+                    );
+                } else if (isVertical) {
+                    positions.push(
+                        { x: cp.x + 50, y: cp.y },  // Right
+                        { x: cp.x - 50, y: cp.y },  // Left
+                        { x: cp.x + 70, y: cp.y },  // Further right
+                        { x: cp.x - 70, y: cp.y }   // Further left
+                    );
+                } else {
+                    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                    const perpAngle = angle + Math.PI / 2;
+
+                    for (let dist of [40, 60, 80]) {
+                        positions.push(
+                            { x: cp.x + Math.cos(perpAngle) * dist, y: cp.y + Math.sin(perpAngle) * dist },
+                            { x: cp.x - Math.cos(perpAngle) * dist, y: cp.y - Math.sin(perpAngle) * dist }
+                        );
+                    }
+                }
+            }
+
+            // Find first position without collision
+            for (const pos of positions) {
+                if (!labelCollides(pos.x, pos.y, labelWidth, labelHeight)) {
+                    return pos;
+                }
+            }
+
+            // Fallback: return the first candidate midpoint above/right
+            return positions[0];
+        };
+
+        // Render all connections
+        return diagram.connections.map((conn, idx) => {
+            const fromComp = diagram.components.find(c => c.id === conn.from);
+            const toComp = diagram.components.find(c => c.id === conn.to);
+            if (!fromComp || !toComp) return null;
+
+            const dx = toComp.x - fromComp.x;
+            const dy = toComp.y - fromComp.y;
+
+            let fromEdge, toEdge;
+
+            if (Math.abs(dy) > Math.abs(dx)) {
+                if (dy > 0) {
+                    fromEdge = 'bottom';
+                    toEdge = 'top';
+                } else {
+                    fromEdge = 'top';
+                    toEdge = 'bottom';
+                }
+            } else {
+                if (dx > 0) {
+                    fromEdge = 'right';
+                    toEdge = 'left';
+                } else {
+                    fromEdge = 'left';
+                    toEdge = 'right';
+                }
+            }
+
+            const fromConnections = connectionPoints.get(fromComp.id)[fromEdge];
+            const toConnections = connectionPoints.get(toComp.id)[toEdge];
+
+            const fromIndex = fromConnections.findIndex(c => c.connIdx === idx);
+            const toIndex = toConnections.findIndex(c => c.connIdx === idx);
+
+            const start = getDistributedPoint(fromComp, fromEdge, fromIndex, fromConnections.length);
+            const end = getDistributedPoint(toComp, toEdge, toIndex, toConnections.length);
+
+            // Obstacle detection
+            const getAllObstacles = () => {
+                return diagram.components
+                    .filter(c => c.id !== fromComp.id && c.id !== toComp.id)
+                    .map(c => ({
+                        left: c.x - c.width / 2 - 25,
+                        right: c.x + c.width / 2 + 25,
+                        top: c.y - c.height / 2 - 25,
+                        bottom: c.y + c.height / 2 + 25
+                    }));
+            };
+
+            const obstacles = getAllObstacles();
+
+            const pathIntersectsObstacles = (points) => {
+                for (let i = 0; i < points.length - 1; i++) {
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+
+                    for (let t = 0; t <= 1; t += 0.1) {
+                        const x = p1.x + (p2.x - p1.x) * t;
+                        const y = p1.y + (p2.y - p1.y) * t;
+
+                        for (const obs of obstacles) {
+                            if (x >= obs.left && x <= obs.right &&
+                                y >= obs.top && y <= obs.bottom) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            };
+
+            // Path routing with variation based on index
+            let pathPoints = [];
+            const routeVariation = (idx % 3) * 15;
+
+            if (fromEdge === 'bottom' && toEdge === 'top') {
+                const midY = (start.y + end.y) / 2 + routeVariation;
+                let directPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+
+                if (!pathIntersectsObstacles(directPath)) {
+                    pathPoints = directPath;
+                } else {
+                    const offset = ((idx % 3) - 1) * 90;
+                    const detourX = (start.x + end.x) / 2 + offset;
+                    pathPoints = [
+                        start,
+                        { x: start.x, y: start.y + 45 },
+                        { x: detourX, y: start.y + 45 },
+                        { x: detourX, y: end.y - 45 },
+                        { x: end.x, y: end.y - 45 },
+                        end
+                    ];
+                }
+            } else if (fromEdge === 'top' && toEdge === 'bottom') {
+                const midY = (start.y + end.y) / 2 - routeVariation;
+                let directPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+
+                if (!pathIntersectsObstacles(directPath)) {
+                    pathPoints = directPath;
+                } else {
+                    const offset = ((idx % 3) - 1) * 90;
+                    const detourX = (start.x + end.x) / 2 + offset;
+                    pathPoints = [
+                        start,
+                        { x: start.x, y: start.y - 45 },
+                        { x: detourX, y: start.y - 45 },
+                        { x: detourX, y: end.y + 45 },
+                        { x: end.x, y: end.y + 45 },
+                        end
+                    ];
+                }
+            } else if (fromEdge === 'right' && toEdge === 'left') {
+                const midX = (start.x + end.x) / 2 + routeVariation;
+                let directPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+
+                if (!pathIntersectsObstacles(directPath)) {
+                    pathPoints = directPath;
+                } else {
+                    const offset = ((idx % 3) - 1) * 70;
+                    const detourY = (start.y + end.y) / 2 + offset;
+                    pathPoints = [
+                        start,
+                        { x: start.x + 45, y: start.y },
+                        { x: start.x + 45, y: detourY },
+                        { x: end.x - 45, y: detourY },
+                        { x: end.x - 45, y: end.y },
+                        end
+                    ];
+                }
+            } else if (fromEdge === 'left' && toEdge === 'right') {
+                const midX = (start.x + end.x) / 2 - routeVariation;
+                let directPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+
+                if (!pathIntersectsObstacles(directPath)) {
+                    pathPoints = directPath;
+                } else {
+                    const offset = ((idx % 3) - 1) * 70;
+                    const detourY = (start.y + end.y) / 2 + offset;
+                    pathPoints = [
+                        start,
+                        { x: start.x - 45, y: start.y },
+                        { x: start.x - 45, y: detourY },
+                        { x: end.x + 45, y: detourY },
+                        { x: end.x + 45, y: end.y },
+                        end
+                    ];
+                }
+            } else {
+                const midX = (start.x + end.x) / 2;
+                const midY = (start.y + end.y) / 2;
+
+                if (fromEdge === 'bottom' || fromEdge === 'top') {
+                    pathPoints = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+                } else {
+                    pathPoints = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+                }
+            }
+
+            // Generate SVG path
+            let pathData = `M ${pathPoints[0].x} ${pathPoints[0].y}`;
+            for (let i = 1; i < pathPoints.length; i++) {
+                pathData += ` L ${pathPoints[i].x} ${pathPoints[i].y}`;
+            }
+
+            // ✅ Dynamic label width estimation
+            const labelWidth = (conn.label ? conn.label.length * 8 : 0) + 24;
+            const labelHeight = 28;
+
+            // ✅ Smart label positioning
+            const bestSegment = findBestLabelPosition(pathPoints);
+            const labelPos = bestSegment
+                ? findClearLabelPosition(pathPoints, bestSegment.index, labelWidth, labelHeight)
+                : { x: (pathPoints[0].x + pathPoints[pathPoints.length - 1].x) / 2, y: (pathPoints[0].y + pathPoints[pathPoints.length - 1].y) / 2 - 40 };
+
+            // Register this label's position
+            placedLabels.push({
+                left: labelPos.x - labelWidth / 2,
+                right: labelPos.x + labelWidth / 2,
+                top: labelPos.y - labelHeight / 2,
+                bottom: labelPos.y + labelHeight / 2
+            });
+
+            const isAsync = conn.type === 'async';
+            const strokeColor = isAsync ? '#94a3b8' : '#64748b';
+            const isBidirectional = conn.type === 'bidirectional';
+
+            return (
+                <g key={idx}>
+                    <path
+                        d={pathData}
+                        stroke="rgba(102, 126, 234, 0.05)"
+                        strokeWidth="14"
+                        fill="none"
+                        style={{ pointerEvents: 'none' }}
+                    />
+
+                    <path
+                        className="connector-path"
+                        d={pathData}
+                        stroke={strokeColor}
+                        strokeWidth="2.5"
+                        fill="none"
+                        markerEnd={`url(#${isAsync ? 'arrowhead' : 'arrowhead-active'})`}
+                        markerStart={isBidirectional ? `url(#arrowhead-start)` : 'none'}
+                        strokeDasharray={isAsync ? '6,4' : 'none'}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{
+                            opacity: 0.85,
+                            transition: 'stroke-width 0.2s, opacity 0.2s'
+                        }}
+                    />
+
+                    {/* ✅ Robust Collision-free label */}
+                    <g transform={`translate(${labelPos.x}, ${labelPos.y})`}>
+                        <rect
+                            x={-labelWidth / 2}
+                            y={-labelHeight / 2}
+                            width={labelWidth}
+                            height={labelHeight}
+                            fill="white"
+                            rx="8"
+                            stroke={isAsync ? '#e2e8f0' : '#dbeafe'}
+                            strokeWidth="1.5"
+                            style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.1))' }}
+                        />
+                        <text
+                            fontSize="10"
+                            fontWeight="700"
+                            fill={isAsync ? '#64748b' : '#3b82f6'}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            style={{ pointerEvents: 'none' }}
+                        >
+                            {conn.label}
+                        </text>
+                    </g>
+                </g>
+            );
+        });
+    })()
+}
                                 {diagram.components.map((comp, idx) => {
                                     const colors = getComponentColor(comp.type);
                                     return (
