@@ -15,7 +15,7 @@ const ArchitectureDiagramGenerator = () => {
 
 
     const [provider, setProvider] = useState('gemini');
-    const [cloudProvider, setCloudProvider] = useState('auto');
+    const [cloudProvider, setCloudProvider] = useState('none');
     const [error, setError] = useState(null);
     const [quotaError, setQuotaError] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -487,7 +487,6 @@ const ArchitectureDiagramGenerator = () => {
                                 minWidth: '200px'
                             }}
                         >
-                            <option value="auto">Auto-Detect Cloud</option>
                             <option value="none">No Cloud Icons</option>
                             <option value="aws">AWS Only</option>
                             <option value="azure">Azure Only</option>
