@@ -66,4 +66,46 @@ describe('App Component', () => {
         const input = screen.getByPlaceholderText(/Describe your system architecture/i);
         await waitFor(() => expect(input.value).toContain('scalable e-commerce platform'));
     });
+
+    it('renders cloud icons when cloudProvider data is present in the API response', async () => {
+        // Mock success response
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                success: true,
+                diagram: {
+                    systemName: "AWS System",
+                    components: [
+                        { id: "c1", name: "Lambda", type: "backend", cloudProvider: "aws", cloudService: "Lambda" },
+                        { id: "c2", name: "S3", type: "database", cloudProvider: "aws", cloudService: "S3" }
+                    ],
+                    connections: [],
+                    layers: [{ name: "App", componentIds: ["c1", "c2"] }]
+                }
+            })
+        });
+
+        const user = userEvent.setup();
+        render(<App />);
+
+        // Enter description
+        const textarea = screen.getByPlaceholderText(/Describe your system architecture/i);
+        await user.type(textarea, "AWS System");
+
+        // Click generate
+        const generateBtn = screen.getByText('Generate Diagram');
+        fireEvent.click(generateBtn);
+
+        // Wait for rendering
+        await waitFor(() => {
+            expect(screen.getByText("AWS System")).toBeInTheDocument();
+        });
+
+        // Verify icons
+        const images = document.querySelectorAll('image');
+        const hrefs = Array.from(images).map(img => img.getAttribute('href'));
+
+        expect(hrefs.some(h => h.includes('aws-lambda'))).toBe(true);
+        expect(hrefs.some(h => h.includes('aws-s3'))).toBe(true);
+    });
 });

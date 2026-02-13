@@ -278,14 +278,22 @@ async function generateWithGroq(systemDescription, promptInstructions) {
  * @param {string} provider 'gemini' | 'groq'
  * @returns {Promise<object>}
  */
-export const generateDiagram = async (systemDescription, promptInstructions = '', provider = 'gemini') => {
+/**
+ * Generates an architecture diagram for the given description
+ * @param {string} systemDescription 
+ * @param {string} promptInstructions Optional custom instructions
+ * @param {string} provider 'gemini' | 'groq'
+ * @param {string} cloudProvider 'auto' | 'aws' | 'azure' | 'gcp' | 'none'
+ * @returns {Promise<object>}
+ */
+export const generateDiagram = async (systemDescription, promptInstructions = '', provider = 'gemini', cloudProvider = 'auto') => {
     if (!systemDescription) {
         throw new Error('System description is required');
     }
 
     // cache key includes provider to avoid mixing different model qualities
-    const cacheKey = `${provider}:${systemDescription}`;
-    const cached = getCachedDiagram(cacheKey) || getCachedDiagram(systemDescription); // Fallback to old cache key format
+    const cacheKey = `${provider}:${cloudProvider}:${systemDescription}`;
+    const cached = getCachedDiagram(cacheKey);
 
     if (cached) {
         return {
@@ -297,11 +305,89 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
         };
     }
 
+    // ✅ Inject Cloud Provider Specific Instructions
+    const cloudInstructions = {
+        'aws': `
+        Analyze the system description and detect cloud services. For each cloud component:
+        
+        AWS Services (use exact names):
+        - Compute: Lambda, EC2, ECS, EKS, Fargate, Elastic Beanstalk
+        - Storage: S3, EBS, EFS, Glacier
+        - Database: DynamoDB, RDS, Aurora, ElastiCache, Redshift, DocumentDB
+        - Networking: API Gateway, CloudFront, Route53, VPC, ELB
+        - Messaging: SQS, SNS, Kinesis, EventBridge
+        - Analytics: Athena, EMR, Glue, QuickSight
+        - ML: SageMaker, Rekognition, Comprehend
+        - Security: IAM, Cognito, Secrets Manager, KMS, WAF
+        - DevOps: CodePipeline, CodeBuild, CodeDeploy
+        - Monitoring: CloudWatch, CloudFormation, CloudTrail
+        
+        Add these fields to components:
+        - "cloudProvider": "aws"
+        - "cloudService": exact service name from list above (e.g. "Lambda", "S3")
+        `,
+
+        'azure': `
+        Analyze the system description and detect cloud services. For each cloud component:
+        
+        Azure Services (use exact names):
+        - Compute: Virtual Machines, App Service, Functions, Container Instances, AKS
+        - Storage: Blob Storage, Files, Queue Storage, Table Storage
+        - Database: Cosmos DB, SQL Database, Database for MySQL, Database for PostgreSQL, Cache for Redis
+        - Networking: Virtual Network, Load Balancer, Application Gateway, CDN, Front Door
+        - Integration: Service Bus, Event Grid, Event Hubs, Logic Apps, API Management
+        - Analytics: Stream Analytics, Data Factory, Databricks, Synapse Analytics
+        - AI/ML: Cognitive Services, Machine Learning, Bot Service
+        - Security: Active Directory, Key Vault, Security Center
+        - DevOps: Azure DevOps, Pipelines
+        - Monitoring: Monitor, Application Insights
+        
+        Add these fields to components:
+        - "cloudProvider": "azure"
+        - "cloudService": exact service name from list above (e.g. "Functions", "Cosmos DB")
+        `,
+
+        'gcp': `
+        Analyze the system description and detect cloud services. For each cloud component:
+        
+        GCP Services (use exact names):
+        - Compute: Compute Engine, App Engine, Cloud Run, Cloud Functions, GKE
+        - Storage: Cloud Storage, Persistent Disk, Filestore
+        - Database: Cloud SQL, Cloud Spanner, Firestore, Bigtable, Memorystore
+        - Networking: Cloud CDN, Cloud Load Balancing, VPC, Cloud DNS
+        - Analytics: BigQuery, Dataflow, Dataproc, Pub/Sub
+        - AI/ML: Vertex AI, AutoML, Vision API, Natural Language
+        - Security: Cloud IAM, Secret Manager, KMS
+        - DevOps: Cloud Build, Artifact Registry
+        - Monitoring: Cloud Monitoring, Cloud Logging
+        
+        Add these fields to components:
+        - "cloudProvider": "gcp"
+        - "cloudService": exact service name from list above (e.g. "Cloud Run", "BigQuery")
+        `,
+
+        'auto': `
+        Analyze the system description to infer the preferred cloud provider.
+        If specific services (e.g., "S3", "Cosmos", "Pub/Sub") are mentioned, use that provider.
+        If generic terms are used, map them to the best matching service from AWS, Azure, or GCP.
+        
+        Explicitly set:
+        - "cloudProvider": "aws" | "azure" | "gcp"
+        - "cloudService": The specific service name (use standard names like "Lambda", "S3", "Functions")
+        `
+    };
+
+    let selectedInstructions = cloudInstructions[cloudProvider] || cloudInstructions['auto'];
+    if (cloudProvider === 'none') selectedInstructions = "";
+
+
+    const fullInstructions = `${promptInstructions}\n\n${selectedInstructions}`;
+
     let result;
     if (provider === 'groq') {
-        result = await generateWithGroq(systemDescription, promptInstructions);
+        result = await generateWithGroq(systemDescription, fullInstructions);
     } else {
-        result = await generateWithGemini(systemDescription, promptInstructions);
+        result = await generateWithGemini(systemDescription, fullInstructions);
     }
 
     setCachedDiagram(cacheKey, result.diagram);

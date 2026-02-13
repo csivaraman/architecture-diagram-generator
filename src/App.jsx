@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Loader2, Sparkles, Network, Download, ZoomIn, ZoomOut, AlertCircle, Info, AlertTriangle, Linkedin, Edit } from 'lucide-react';
 import { openInDrawioWithLocalStorage } from './utils/drawioIntegration';
+import { getCloudIcon, getCloudBadge, normalizeServiceName } from './utils/cloudIcons';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
 
@@ -11,7 +12,10 @@ const ArchitectureDiagramGenerator = () => {
     const [loading, setLoading] = useState(false);
     const [diagram, setDiagram] = useState(null);
     const [zoom, setZoom] = useState(1);
+
+
     const [provider, setProvider] = useState('gemini');
+    const [cloudProvider, setCloudProvider] = useState('auto');
     const [error, setError] = useState(null);
     const [quotaError, setQuotaError] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -46,7 +50,7 @@ const ArchitectureDiagramGenerator = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ systemDescription: descToUse, provider }),
+                body: JSON.stringify({ systemDescription: descToUse, provider, cloudProvider }),
             });
 
             const result = await response.json();
@@ -107,8 +111,8 @@ const ArchitectureDiagramGenerator = () => {
     };
 
     const layoutDiagram = (architecture, systemName) => {
-        const COMPONENT_WIDTH = isMobile ? 140 : (isTablet ? 160 : 180);
-        const COMPONENT_HEIGHT = isMobile ? 70 : 80;
+        const COMPONENT_WIDTH = isMobile ? 150 : (isTablet ? 180 : 220);
+        const COMPONENT_HEIGHT = isMobile ? 90 : 120;
         const COMPONENT_GAP_X = isMobile ? 40 : (isTablet ? 60 : 80);
         const LAYER_HEIGHT = isMobile ? 200 : 250;
         const TITLE_SPACE = 50;
@@ -206,6 +210,8 @@ const ArchitectureDiagramGenerator = () => {
         const width = Math.max(isMobile ? 350 : 1200, calculatedWidth);
         const height = PADDING_TOP + (architecture.layers.length * LAYER_HEIGHT) + 40;
 
+
+
         const components = architecture.components.map(comp => {
             const layerIndex = architecture.layers.findIndex(layer =>
                 layer.componentIds.includes(comp.id)
@@ -219,13 +225,22 @@ const ArchitectureDiagramGenerator = () => {
             const totalLayerContentWidth = componentsInLayer * COMPONENT_WIDTH + (componentsInLayer - 1) * COMPONENT_GAP_X;
             const startX = (width - totalLayerContentWidth) / 2;
 
+            // ✅ Extract cloud metadata if available
+            // Normalize service name for better matching
+            const normalizedService = comp.cloudService ? normalizeServiceName(comp.cloudService) : '';
+            const cloudIconUrl = comp.cloudProvider ? getCloudIcon(comp.cloudProvider, normalizedService) : null;
+            const cloudBadge = comp.cloudProvider ? getCloudBadge(comp.cloudProvider) : null;
+
             return {
                 ...comp,
                 x: startX + indexInLayer * (COMPONENT_WIDTH + COMPONENT_GAP_X) + COMPONENT_WIDTH / 2,
                 y: PADDING_TOP + (layerIndex * LAYER_HEIGHT) + LAYER_LABEL_HEIGHT + (LAYER_HEIGHT - LAYER_LABEL_HEIGHT) / 2,
                 width: COMPONENT_WIDTH,
                 height: COMPONENT_HEIGHT,
-                layerIndex
+                layerIndex,
+                cloudIconUrl,
+                cloudBadge,
+                normalizedService // Pass this if needed, or just rely on cloudService
             };
         });
 
@@ -396,7 +411,7 @@ const ArchitectureDiagramGenerator = () => {
 
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', fontSize: '0.95rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
-                            System Description
+                            System Description & Cloud Preference
                         </label>
                         <textarea
                             value={description}
@@ -451,6 +466,33 @@ const ArchitectureDiagramGenerator = () => {
                         >
                             <option value="gemini">Google Gemini</option>
                             <option value="groq">Groq Llama</option>
+                        </select>
+
+                        <select
+                            value={cloudProvider}
+                            onChange={(e) => setCloudProvider(e.target.value)}
+                            disabled={loading}
+                            style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '1rem',
+                                fontWeight: 600,
+                                color: '#4b5563',
+                                background: 'white',
+                                border: '2px solid #e5e7eb',
+                                borderRadius: '12px',
+                                cursor: loading ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s',
+                                appearance: 'none',
+                                textAlign: 'center',
+                                minWidth: '200px'
+                            }}
+                        >
+                            <option value="auto">Auto-Detect Cloud</option>
+                            <option value="none">No Cloud Icons</option>
+                            <option value="aws">AWS Only</option>
+                            <option value="azure">Azure Only</option>
+                            <option value="gcp">GCP Only</option>
+                            <option value="hybrid">Multi-Cloud</option>
                         </select>
 
                         <select
@@ -1171,6 +1213,13 @@ const ArchitectureDiagramGenerator = () => {
                                 }
                                 {diagram.components.map((comp, idx) => {
                                     const colors = getComponentColor(comp.type);
+
+                                    // Normalize service name for better matching
+                                    const normalizedService = normalizeServiceName(comp.cloudService);
+                                    const cloudIconUrl = comp.cloudProvider
+                                        ? getCloudIcon(comp.cloudProvider, normalizedService)
+                                        : null;
+
                                     return (
                                         <g key={idx} transform={`translate(${comp.x - comp.width / 2}, ${comp.y - comp.height / 2})`}>
                                             <rect
@@ -1182,6 +1231,44 @@ const ArchitectureDiagramGenerator = () => {
                                                 rx="10"
                                                 filter="url(#shadow)"
                                             />
+
+                                            {/* ✅ Cloud Provider Icon Badge */}
+                                            {cloudIconUrl && (
+                                                <image
+                                                    href={cloudIconUrl}
+                                                    x={comp.width - 30}
+                                                    y="6"
+                                                    width="24"
+                                                    height="24"
+                                                    style={{
+                                                        opacity: 0.95,
+                                                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))'
+                                                    }}
+                                                />
+                                            )}
+
+                                            {/* ✅ Fallback: Colored Badge if icon fails */}
+                                            {comp.cloudProvider && !cloudIconUrl && (
+                                                <g transform={`translate(${comp.width - 30}, 12)`}>
+                                                    <circle
+                                                        r="12"
+                                                        fill={getCloudBadge(comp.cloudProvider)?.color || '#666'}
+                                                        stroke="white"
+                                                        strokeWidth="2"
+                                                        filter="drop-shadow(0 1px 3px rgba(0,0,0,0.2))"
+                                                    />
+                                                    <text
+                                                        fontSize="8"
+                                                        fontWeight="700"
+                                                        fill="white"
+                                                        textAnchor="middle"
+                                                        dominantBaseline="central"
+                                                    >
+                                                        {getCloudBadge(comp.cloudProvider)?.text || '☁'}
+                                                    </text>
+                                                </g>
+                                            )}
+
                                             <foreignObject width={comp.width} height={comp.height}>
                                                 <div xmlns="http://www.w3.org/1999/xhtml" style={{
                                                     display: 'flex',
@@ -1191,14 +1278,64 @@ const ArchitectureDiagramGenerator = () => {
                                                     height: '100%',
                                                     color: 'white',
                                                     textAlign: 'center',
-                                                    padding: '8px'
+                                                    padding: '8px',
+                                                    paddingRight: cloudIconUrl ? '32px' : '8px' // Make room for icon
                                                 }}>
-                                                    <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '2px' }}>{comp.name}</div>
-                                                    <div style={{ fontSize: '10px', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{comp.type}</div>
+                                                    <div style={{
+                                                        fontWeight: 'bold',
+                                                        fontSize: '14px',
+                                                        marginBottom: '2px',
+                                                        lineHeight: '1.2'
+                                                    }}>
+                                                        {comp.name}
+                                                    </div>
+
+                                                    <div style={{
+                                                        fontSize: '10px',
+                                                        opacity: 0.9,
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.5px'
+                                                    }}>
+                                                        {comp.type}
+                                                    </div>
+
+                                                    {/* ✅ Show cloud service name */}
+                                                    {comp.cloudService && (
+                                                        <div style={{
+                                                            fontSize: '8px',
+                                                            marginTop: '4px',
+                                                            opacity: 0.85,
+                                                            background: 'rgba(255,255,255,0.2)',
+                                                            padding: '2px 6px',
+                                                            borderRadius: '4px',
+                                                            maxWidth: '90%',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            {comp.cloudService}
+                                                        </div>
+                                                    )}
+
                                                     {comp.technologies && comp.technologies.length > 0 && (
-                                                        <div style={{ fontSize: '9px', marginTop: '4px', opacity: 0.8, display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                                        <div style={{
+                                                            fontSize: '9px',
+                                                            marginTop: '4px',
+                                                            opacity: 0.8,
+                                                            display: 'flex',
+                                                            gap: '4px',
+                                                            flexWrap: 'wrap',
+                                                            justifyContent: 'center',
+                                                            maxWidth: '100%'
+                                                        }}>
                                                             {comp.technologies.slice(0, 2).map(t => (
-                                                                <span key={t} style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px', borderRadius: '4px' }}>{t}</span>
+                                                                <span key={t} style={{
+                                                                    background: 'rgba(0,0,0,0.2)',
+                                                                    padding: '1px 4px',
+                                                                    borderRadius: '4px'
+                                                                }}>
+                                                                    {t}
+                                                                </span>
                                                             ))}
                                                         </div>
                                                     )}

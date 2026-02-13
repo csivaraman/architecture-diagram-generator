@@ -19,7 +19,7 @@ export default async function handler(req, res) {
         return res.status(405).json({ success: false, error: 'Method Not Allowed' });
     }
 
-    const { systemDescription, instructions, provider } = req.body;
+    const { systemDescription, instructions, provider, cloudProvider } = req.body;
 
     if (!systemDescription || typeof systemDescription !== 'string' || systemDescription.trim().length === 0) {
         return res.status(400).json({
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const result = await generateDiagram(systemDescription, instructions || '', provider);
+        const result = await generateDiagram(systemDescription, instructions || '', provider, cloudProvider);
         return res.status(200).json(result);
     } catch (error) {
         console.error('[API Error]', error);
