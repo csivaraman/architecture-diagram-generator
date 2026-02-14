@@ -432,8 +432,12 @@ export const findBestLabelPosition = (pathPoints) => {
 
 /**
  * Finds a collision-free position for a label along a connector path.
- * Tries positions at 25%, 50%, 75% along every internal segment,
- * with perpendicular offsets at increasing distances.
+ * Strategy (in priority order):
+ *   1. Sample at 25-75% along each internal segment with perpendicular offsets
+ *   2. Try all four cardinal directions at increasing distances
+ *   3. Grid-search a rectangular region around every segment midpoint
+ *   4. Absolute fallback: push label far away from the nearest component
+ *
  * @param {Array} pathPoints - the connector path points
  * @param {number} segmentIndex - preferred segment (longest)
  * @param {Array} components - all diagram components
@@ -443,8 +447,15 @@ export const findBestLabelPosition = (pathPoints) => {
  */
 export const findClearLabelPosition = (pathPoints, segmentIndex, components, placedLabels, labelWidth = 90, labelHeight = 26) => {
     const hw = labelWidth / 2;
+    const hh = labelHeight / 2;
 
-    // Generate candidate positions for a given segment
+    // Helper: check a position and return it if clear
+    const tryPos = (x, y) =>
+        !labelCollides(x, y, pathPoints, components, placedLabels, labelWidth, labelHeight)
+            ? { x, y }
+            : null;
+
+    // ── Phase 1: Perpendicular + along-path offsets on each segment ──────
     const getCandidates = (p1, p2) => {
         const candidates = [];
         const isVertical = Math.abs(p1.x - p2.x) < 5;
@@ -452,24 +463,33 @@ export const findClearLabelPosition = (pathPoints, segmentIndex, components, pla
         const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
         const perpAngle = angle + Math.PI / 2;
 
-        // Sample at 25%, 50%, 75% along segment
         for (const t of [0.5, 0.35, 0.65, 0.25, 0.75]) {
             const mx = p1.x + (p2.x - p1.x) * t;
             const my = p1.y + (p2.y - p1.y) * t;
 
             if (isHorizontal) {
-                for (const dy of [-30, 30, -48, 48, -18]) {
+                for (const dy of [-30, 30, -48, 48, -18, -65, 65]) {
                     candidates.push({ x: mx, y: my + dy });
                 }
             } else if (isVertical) {
-                for (const dx of [hw + 12, -(hw + 12), hw + 30, -(hw + 30)]) {
+                for (const dx of [hw + 12, -(hw + 12), hw + 30, -(hw + 30), hw + 50, -(hw + 50)]) {
                     candidates.push({ x: mx + dx, y: my });
                 }
             } else {
-                for (const dist of [32, 50, 70]) {
+                // Diagonal segments: perpendicular offsets at varied distances
+                for (const dist of [32, 50, 70, 95]) {
                     candidates.push(
                         { x: mx + Math.cos(perpAngle) * dist, y: my + Math.sin(perpAngle) * dist },
                         { x: mx - Math.cos(perpAngle) * dist, y: my - Math.sin(perpAngle) * dist }
+                    );
+                }
+                // Also try pure cardinal offsets from diagonal midpoints
+                for (const d of [40, 65]) {
+                    candidates.push(
+                        { x: mx, y: my - d },
+                        { x: mx, y: my + d },
+                        { x: mx - d, y: my },
+                        { x: mx + d, y: my }
                     );
                 }
             }
@@ -477,42 +497,83 @@ export const findClearLabelPosition = (pathPoints, segmentIndex, components, pla
         return candidates;
     };
 
-    // Build ordered list of segments to try: preferred first, then others
+    // Build ordered list of segments: preferred first, then others
     const segmentOrder = [segmentIndex];
     for (let i = 1; i < pathPoints.length - 1; i++) {
         if (i !== segmentIndex) segmentOrder.push(i);
     }
 
-    // Try each segment's candidates
     for (const si of segmentOrder) {
         if (si < 0 || si + 1 >= pathPoints.length) continue;
         const candidates = getCandidates(pathPoints[si], pathPoints[si + 1]);
         for (const pos of candidates) {
-            if (!labelCollides(pos.x, pos.y, pathPoints, components, placedLabels, labelWidth, labelHeight)) {
-                return pos;
-            }
+            const hit = tryPos(pos.x, pos.y);
+            if (hit) return hit;
         }
     }
 
-    // Final fallback: try larger perpendicular offsets from the preferred segment midpoint
+    // ── Phase 2: Four-direction sweep at larger distances ────────────────
     const p1 = pathPoints[segmentIndex];
     const p2 = pathPoints[segmentIndex + 1];
     const mx = (p1.x + p2.x) / 2;
     const my = (p1.y + p2.y) / 2;
-    const isVert = Math.abs(p1.x - p2.x) < 5;
-    for (let offset = 80; offset <= 160; offset += 20) {
-        const fallbacks = isVert
-            ? [{ x: mx + offset, y: my }, { x: mx - offset, y: my }]
-            : [{ x: mx, y: my - offset }, { x: mx, y: my + offset }];
-        for (const pos of fallbacks) {
-            if (!labelCollides(pos.x, pos.y, pathPoints, components, placedLabels, labelWidth, labelHeight)) {
-                return pos;
+
+    for (let offset = 80; offset <= 200; offset += 20) {
+        for (const pos of [
+            { x: mx, y: my - offset },
+            { x: mx, y: my + offset },
+            { x: mx + offset, y: my },
+            { x: mx - offset, y: my },
+            { x: mx + offset * 0.7, y: my - offset * 0.7 },
+            { x: mx - offset * 0.7, y: my + offset * 0.7 }
+        ]) {
+            const hit = tryPos(pos.x, pos.y);
+            if (hit) return hit;
+        }
+    }
+
+    // ── Phase 3: Grid search around every segment midpoint ───────────────
+    for (const si of segmentOrder) {
+        if (si < 0 || si + 1 >= pathPoints.length) continue;
+        const sp1 = pathPoints[si];
+        const sp2 = pathPoints[si + 1];
+        const gmx = (sp1.x + sp2.x) / 2;
+        const gmy = (sp1.y + sp2.y) / 2;
+
+        for (let dx = -120; dx <= 120; dx += 40) {
+            for (let dy = -120; dy <= 120; dy += 30) {
+                if (dx === 0 && dy === 0) continue;
+                const hit = tryPos(gmx + dx, gmy + dy);
+                if (hit) return hit;
             }
         }
     }
 
-    // Absolute fallback
-    return { x: mx, y: my - 35 };
+    // ── Phase 4: Guaranteed-safe absolute fallback ───────────────────────
+    // Push label far enough from all components that it cannot collide.
+    let bestX = mx;
+    let bestY = my - 60;
+    let bestMinDist = 0;
+    for (const dir of [
+        { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
+        { dx: 1, dy: 0 }, { dx: -1, dy: 0 }
+    ]) {
+        for (let step = 100; step <= 250; step += 30) {
+            const cx = mx + dir.dx * step;
+            const cy = my + dir.dy * step;
+            let minCompDist = Infinity;
+            for (const comp of components) {
+                const d = Math.sqrt((cx - comp.x) ** 2 + (cy - comp.y) ** 2);
+                minCompDist = Math.min(minCompDist, d);
+            }
+            if (minCompDist > bestMinDist) {
+                bestMinDist = minCompDist;
+                bestX = cx;
+                bestY = cy;
+            }
+        }
+    }
+    return { x: bestX, y: bestY };
 };
 
 export const segmentPassesThroughComponent = (x1, y1, x2, y2, comp) => {
