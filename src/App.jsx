@@ -14,7 +14,8 @@ import {
     findClearLabelPosition,
     segmentPassesThroughComponent,
     pathIntersectsObstacles,
-    measureLabelText
+    measureLabelText,
+    clipSegmentsAroundLabels
 } from './utils/diagramLayout';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
@@ -557,13 +558,14 @@ const ArchitectureDiagramGenerator = () => {
 
                                         redistributeOvercrowdedEdges(diagram.components, connectionPoints);
 
+                                        // ── Pass 1: Compute all connection data ──────────────────
                                         const placedLabels = [];
+                                        const connectionData = [];
 
-                                        // Render connections
-                                        return diagram.connections.map((conn, idx) => {
+                                        diagram.connections.forEach((conn, idx) => {
                                             const fromComp = diagram.components.find(c => c.id === conn.from);
                                             const toComp = diagram.components.find(c => c.id === conn.to);
-                                            if (!fromComp || !toComp) return null;
+                                            if (!fromComp || !toComp) return;
 
                                             const dx = toComp.x - fromComp.x;
                                             const dy = toComp.y - fromComp.y;
@@ -587,156 +589,172 @@ const ArchitectureDiagramGenerator = () => {
                                             const start = getDistributedPoint(fromComp, fromEdge, fromIndex, fromConnections.length);
                                             const end = getDistributedPoint(toComp, toEdge, toIndex, toConnections.length);
 
-                                            const getAllObstacles = () => {
-                                                return diagram.components
-                                                    .filter(c => c.id !== fromComp.id && c.id !== toComp.id)
-                                                    .map(c => ({
-                                                        ...c,
-                                                        left: c.x - c.width / 2 - 25,
-                                                        right: c.x + c.width / 2 + 25,
-                                                        top: c.y - c.height / 2 - 25,
-                                                        bottom: c.y + c.height / 2 + 25
-                                                    }));
-                                            };
-
-                                            const obstacles = getAllObstacles();
+                                            const obstacles = diagram.components
+                                                .filter(c => c.id !== fromComp.id && c.id !== toComp.id)
+                                                .map(c => ({
+                                                    ...c,
+                                                    left: c.x - c.width / 2 - 25,
+                                                    right: c.x + c.width / 2 + 25,
+                                                    top: c.y - c.height / 2 - 25,
+                                                    bottom: c.y + c.height / 2 + 25
+                                                }));
 
                                             const routeVariation = (idx % 3) * 15;
                                             const detourOffset = ((idx % 3) - 1) * 90;
 
                                             const { pathPoints, pathSegments } = calculateConnectorPath(
-                                                start,
-                                                end,
-                                                fromEdge,
-                                                toEdge,
-                                                routeVariation,
-                                                detourOffset,
-                                                obstacles
+                                                start, end, fromEdge, toEdge,
+                                                routeVariation, detourOffset, obstacles
                                             );
 
                                             const bestSegment = findBestLabelPosition(pathPoints);
                                             const labelDims = measureLabelText(conn.label);
-                                            const labelPos = findClearLabelPosition(pathPoints, bestSegment.index, diagram.components, placedLabels, labelDims.width, labelDims.height);
+                                            const labelPos = findClearLabelPosition(
+                                                pathPoints, bestSegment.index,
+                                                diagram.components, placedLabels,
+                                                labelDims.width, labelDims.height
+                                            );
 
-                                            // Register label position with actual dimensions
                                             const hw = labelDims.width / 2;
                                             const hh = labelDims.height / 2;
-                                            placedLabels.push({
+
+                                            const labelBound = {
                                                 left: labelPos.x - hw,
                                                 right: labelPos.x + hw,
                                                 top: labelPos.y - hh,
                                                 bottom: labelPos.y + hh
-                                            });
+                                            };
+                                            placedLabels.push(labelBound);
 
-                                            const isAsync = conn.type === 'async';
                                             const connectorColor = getConnectorColor(idx, fromComp, toComp);
 
-                                            const isActive = activeConnection === idx;
+                                            connectionData.push({
+                                                idx, conn, pathSegments, pathPoints,
+                                                labelPos, labelDims, labelBound,
+                                                hw, hh, connectorColor,
+                                                isAsync: conn.type === 'async'
+                                            });
+                                        });
 
-                                            // Make style dynamic based on hover
-                                            const strokeWidth = isActive ? 4 : 2.5;
-                                            const opacity = isActive ? 1 : 0.85;
-                                            const glowWidth = isActive ? 20 : 14;
-                                            const glowOpacity = isActive ? 0.2 : 0.05;
+                                        // ── Clip all segments against ALL label bounds ───────────
+                                        const allLabelBounds = connectionData.map(cd => cd.labelBound);
 
-                                            return (
-                                                <g
-                                                    key={idx}
-                                                    onMouseEnter={() => setActiveConnection(idx)}
-                                                    onMouseLeave={() => setActiveConnection(null)}
-                                                    style={{ cursor: 'pointer', transition: 'all 0.3s ease' }}
-                                                >
-                                                    {/* Render each segment separately with conditional dashing */}
-                                                    {pathSegments.map((seg, segIdx) => (
-                                                        <g key={`seg-${segIdx}`}>
-                                                            {/* Glow */}
-                                                            <line
-                                                                x1={seg.x1}
-                                                                y1={seg.y1}
-                                                                x2={seg.x2}
-                                                                y2={seg.y2}
+                                        connectionData.forEach(cd => {
+                                            cd.clippedSegments = clipSegmentsAroundLabels(cd.pathSegments, allLabelBounds);
+                                        });
+
+                                        // ── Pass 2: Render in two layers ─────────────────────────
+                                        return (
+                                            <>
+                                                {/* Layer 1: All connector lines (clipped around labels) */}
+                                                {connectionData.map(cd => {
+                                                    const { idx, conn, clippedSegments, pathSegments, connectorColor, isAsync } = cd;
+                                                    const isActive = activeConnection === idx;
+                                                    const strokeWidth = isActive ? 4 : 2.5;
+                                                    const opacity = isActive ? 1 : 0.85;
+                                                    const glowWidth = isActive ? 20 : 14;
+                                                    const glowOpacity = isActive ? 0.2 : 0.05;
+                                                    const totalOrigSegs = pathSegments.length;
+
+                                                    return (
+                                                        <g
+                                                            key={`conn-lines-${idx}`}
+                                                            onMouseEnter={() => setActiveConnection(idx)}
+                                                            onMouseLeave={() => setActiveConnection(null)}
+                                                            style={{ cursor: 'pointer', transition: 'all 0.3s ease' }}
+                                                        >
+                                                            {clippedSegments.map((seg, segIdx) => (
+                                                                <g key={`seg-${segIdx}`}>
+                                                                    {/* Glow */}
+                                                                    <line
+                                                                        x1={seg.x1} y1={seg.y1}
+                                                                        x2={seg.x2} y2={seg.y2}
+                                                                        stroke={connectorColor}
+                                                                        strokeWidth={glowWidth}
+                                                                        strokeOpacity={glowOpacity}
+                                                                        strokeLinecap="round"
+                                                                        style={{ transition: 'all 0.3s ease' }}
+                                                                    />
+                                                                    {/* Main line */}
+                                                                    <line
+                                                                        x1={seg.x1} y1={seg.y1}
+                                                                        x2={seg.x2} y2={seg.y2}
+                                                                        stroke={connectorColor}
+                                                                        strokeWidth={strokeWidth}
+                                                                        strokeDasharray={seg.dashed ? '8,4' : (isAsync ? '6,4' : 'none')}
+                                                                        strokeLinecap="round"
+                                                                        markerEnd={segIdx === clippedSegments.length - 1 ? `url(#arrowhead-${idx % 8})` : 'none'}
+                                                                        style={{
+                                                                            opacity,
+                                                                            transition: 'all 0.3s ease',
+                                                                            filter: isActive ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
+                                                                        }}
+                                                                    />
+                                                                </g>
+                                                            ))}
+                                                        </g>
+                                                    );
+                                                })}
+
+                                                {/* Layer 2: All labels on top of ALL connector lines */}
+                                                {connectionData.map(cd => {
+                                                    const { idx, conn, labelPos, labelDims, hw, hh, connectorColor } = cd;
+                                                    const isActive = activeConnection === idx;
+
+                                                    return (
+                                                        <g
+                                                            key={`conn-label-${idx}`}
+                                                            transform={`translate(${labelPos.x}, ${labelPos.y})`}
+                                                            onMouseEnter={() => setActiveConnection(idx)}
+                                                            onMouseLeave={() => setActiveConnection(null)}
+                                                            style={{
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                                transformOrigin: `${labelPos.x}px ${labelPos.y}px`
+                                                            }}
+                                                            filter={isActive ? `url(#label-glow-${idx % 8})` : 'none'}
+                                                        >
+                                                            {/* Masking rect — fully opaque, hides any connector remnants */}
+                                                            <rect
+                                                                x={-hw - 4}
+                                                                y={-hh - 3}
+                                                                width={labelDims.width + 8}
+                                                                height={labelDims.height + 6}
+                                                                fill="white"
+                                                                rx="8"
+                                                                stroke="none"
+                                                                opacity={1}
+                                                            />
+                                                            {/* Visible label box */}
+                                                            <rect
+                                                                x={-hw}
+                                                                y={-hh}
+                                                                width={labelDims.width}
+                                                                height={labelDims.height}
+                                                                fill="white"
+                                                                rx="6"
                                                                 stroke={connectorColor}
-                                                                strokeWidth={glowWidth}
-                                                                strokeOpacity={glowOpacity}
-                                                                strokeLinecap="round"
+                                                                strokeWidth={isActive ? 2.5 : 1.5}
                                                                 style={{ transition: 'all 0.3s ease' }}
                                                             />
-
-                                                            {/* Main line */}
-                                                            <line
-                                                                x1={seg.x1}
-                                                                y1={seg.y1}
-                                                                x2={seg.x2}
-                                                                y2={seg.y2}
-                                                                stroke={connectorColor}
-                                                                strokeWidth={strokeWidth}
-                                                                strokeDasharray={seg.dashed ? '8,4' : (isAsync ? '6,4' : 'none')}
-                                                                strokeLinecap="round"
-                                                                markerEnd={segIdx === pathSegments.length - 1 ? `url(#arrowhead-${idx % 8})` : 'none'}
+                                                            <text
+                                                                fontSize={isActive ? "11.5" : "10"}
+                                                                fontWeight="700"
+                                                                fill={connectorColor}
+                                                                textAnchor="middle"
+                                                                dominantBaseline="central"
                                                                 style={{
-                                                                    opacity,
                                                                     transition: 'all 0.3s ease',
-                                                                    filter: isActive ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
+                                                                    letterSpacing: isActive ? '0.3px' : '0px'
                                                                 }}
-                                                            />
+                                                            >
+                                                                {conn.label}
+                                                            </text>
                                                         </g>
-                                                    ))}
-
-                                                    {/* Label — auto-sized, glow on hover, masks connector underneath */}
-                                                    <g
-                                                        transform={`translate(${labelPos.x}, ${labelPos.y})`}
-                                                        onMouseEnter={() => setActiveConnection(idx)}
-                                                        onMouseLeave={() => setActiveConnection(null)}
-                                                        style={{
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                            transformOrigin: `${labelPos.x}px ${labelPos.y}px`
-                                                        }}
-                                                        filter={isActive ? `url(#label-glow-${idx % 8})` : 'none'}
-                                                    >
-                                                        {/* Masking rect — slightly larger, fully hides connector line underneath */}
-                                                        <rect
-                                                            x={-hw - 4}
-                                                            y={-hh - 3}
-                                                            width={labelDims.width + 8}
-                                                            height={labelDims.height + 6}
-                                                            fill="white"
-                                                            rx="8"
-                                                            stroke="none"
-                                                            opacity={isActive ? 1 : 0.92}
-                                                            style={{ transition: 'opacity 0.3s ease' }}
-                                                        />
-                                                        {/* Visible label box */}
-                                                        <rect
-                                                            x={-hw}
-                                                            y={-hh}
-                                                            width={labelDims.width}
-                                                            height={labelDims.height}
-                                                            fill="white"
-                                                            rx="6"
-                                                            stroke={connectorColor}
-                                                            strokeWidth={isActive ? 2.5 : 1.5}
-                                                            style={{
-                                                                transition: 'all 0.3s ease'
-                                                            }}
-                                                        />
-                                                        <text
-                                                            fontSize={isActive ? "11.5" : "10"}
-                                                            fontWeight="700"
-                                                            fill={connectorColor}
-                                                            textAnchor="middle"
-                                                            dominantBaseline="central"
-                                                            style={{
-                                                                transition: 'all 0.3s ease',
-                                                                letterSpacing: isActive ? '0.3px' : '0px'
-                                                            }}
-                                                        >
-                                                            {conn.label}
-                                                        </text>
-                                                    </g>
-                                                </g>
-                                            );
-                                        });
+                                                    );
+                                                })}
+                                            </>
+                                        );
                                     })()
                                 }
                                 {diagram.components.map((comp, idx) => {

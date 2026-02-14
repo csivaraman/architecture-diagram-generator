@@ -617,3 +617,122 @@ export const pathIntersectsObstacles = (points, obstacles) => {
     }
     return false;
 };
+
+/**
+ * Clips line segments to exclude portions that fall within any label bounding box.
+ * Each label bound is { left, right, top, bottom }.
+ * Returns new array of segments with the same properties (dashed, etc.)
+ * but with portions inside labels removed.
+ *
+ * @param {Array<{x1,y1,x2,y2,dashed:boolean}>} segments
+ * @param {Array<{left,right,top,bottom}>} labelBounds - all label bounding rects
+ * @returns {Array<{x1,y1,x2,y2,dashed:boolean}>}
+ */
+export const clipSegmentsAroundLabels = (segments, labelBounds) => {
+    if (!labelBounds || labelBounds.length === 0) return segments;
+
+    const PAD = 4; // extra padding so line stops a few px before label edge
+
+    const result = [];
+
+    for (const seg of segments) {
+        // Start with the full segment as a list of sub-segments to process
+        let pieces = [{ ...seg }];
+
+        for (const lb of labelBounds) {
+            const padded = {
+                left: lb.left - PAD,
+                right: lb.right + PAD,
+                top: lb.top - PAD,
+                bottom: lb.bottom + PAD
+            };
+
+            const nextPieces = [];
+
+            for (const piece of pieces) {
+                const clipped = clipOneSeg(piece, padded);
+                nextPieces.push(...clipped);
+            }
+
+            pieces = nextPieces;
+        }
+
+        result.push(...pieces);
+    }
+
+    return result;
+};
+
+/**
+ * Clips a single line segment against a rect.
+ * Returns array of 0-2 sub-segments that are OUTSIDE the rect.
+ */
+function clipOneSeg(seg, rect) {
+    const { x1, y1, x2, y2, dashed } = seg;
+
+    // Parametric: P(t) = (x1 + t*(x2-x1), y1 + t*(y2-y1)), t in [0,1]
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+
+    // Find t-range where segment is inside the rect using Cohen-Sutherland style
+    let tEnter = 0;
+    let tExit = 1;
+
+    const edges = [
+        { p: -dx, q: x1 - rect.left },   // left
+        { p: dx, q: rect.right - x1 },   // right
+        { p: -dy, q: y1 - rect.top },     // top
+        { p: dy, q: rect.bottom - y1 }   // bottom
+    ];
+
+    for (const { p, q } of edges) {
+        if (Math.abs(p) < 0.001) {
+            // Parallel to this edge
+            if (q < 0) {
+                // Entirely outside this edge → segment is fully outside
+                return [seg];
+            }
+            continue;
+        }
+        const t = q / p;
+        if (p < 0) {
+            // Entering
+            if (t > tEnter) tEnter = t;
+        } else {
+            // Exiting
+            if (t < tExit) tExit = t;
+        }
+    }
+
+    if (tEnter >= tExit) {
+        // No intersection — segment is entirely outside
+        return [seg];
+    }
+
+    // The segment intersects the rect from t=tEnter to t=tExit
+    const results = [];
+
+    // Part before the rect
+    if (tEnter > 0.01) {
+        results.push({
+            x1: x1,
+            y1: y1,
+            x2: x1 + tEnter * dx,
+            y2: y1 + tEnter * dy,
+            dashed
+        });
+    }
+
+    // Part after the rect
+    if (tExit < 0.99) {
+        results.push({
+            x1: x1 + tExit * dx,
+            y1: y1 + tExit * dy,
+            x2: x2,
+            y2: y2,
+            dashed
+        });
+    }
+
+    return results;
+}
