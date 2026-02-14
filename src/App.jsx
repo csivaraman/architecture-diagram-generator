@@ -493,6 +493,20 @@ const ArchitectureDiagramGenerator = () => {
                                     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
                                         <feDropShadow dx="2" dy="4" stdDeviation="4" floodOpacity="0.15" />
                                     </filter>
+
+                                    {/* Label glow filters — one per connector color */}
+                                    {['#64748b', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'].map((color, i) => (
+                                        <filter key={`label-glow-${i}`} id={`label-glow-${i}`} x="-40%" y="-40%" width="180%" height="180%">
+                                            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+                                            <feFlood floodColor={color} floodOpacity="0.35" result="color" />
+                                            <feComposite in="color" in2="blur" operator="in" result="coloredBlur" />
+                                            <feMerge>
+                                                <feMergeNode in="coloredBlur" />
+                                                <feMergeNode in="coloredBlur" />
+                                                <feMergeNode in="SourceGraphic" />
+                                            </feMerge>
+                                        </filter>
+                                    ))}
                                 </defs>
 
                                 {
@@ -668,14 +682,31 @@ const ArchitectureDiagramGenerator = () => {
                                                         </g>
                                                     ))}
 
-                                                    {/* Label — auto-sized to fit text */}
+                                                    {/* Label — auto-sized, glow on hover, masks connector underneath */}
                                                     <g
                                                         transform={`translate(${labelPos.x}, ${labelPos.y})`}
+                                                        onMouseEnter={() => setActiveConnection(idx)}
+                                                        onMouseLeave={() => setActiveConnection(null)}
                                                         style={{
-                                                            transition: 'all 0.3s ease',
-                                                            transformOrigin: 'center'
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            transformOrigin: `${labelPos.x}px ${labelPos.y}px`
                                                         }}
+                                                        filter={isActive ? `url(#label-glow-${idx % 8})` : 'none'}
                                                     >
+                                                        {/* Masking rect — slightly larger, fully hides connector line underneath */}
+                                                        <rect
+                                                            x={-hw - 4}
+                                                            y={-hh - 3}
+                                                            width={labelDims.width + 8}
+                                                            height={labelDims.height + 6}
+                                                            fill="white"
+                                                            rx="8"
+                                                            stroke="none"
+                                                            opacity={isActive ? 1 : 0.92}
+                                                            style={{ transition: 'opacity 0.3s ease' }}
+                                                        />
+                                                        {/* Visible label box */}
                                                         <rect
                                                             x={-hw}
                                                             y={-hh}
@@ -684,19 +715,21 @@ const ArchitectureDiagramGenerator = () => {
                                                             fill="white"
                                                             rx="6"
                                                             stroke={connectorColor}
-                                                            strokeWidth={isActive ? 2 : 1.5}
+                                                            strokeWidth={isActive ? 2.5 : 1.5}
                                                             style={{
-                                                                filter: isActive ? 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' : 'drop-shadow(0 2px 8px rgba(0,0,0,0.12))',
                                                                 transition: 'all 0.3s ease'
                                                             }}
                                                         />
                                                         <text
-                                                            fontSize={isActive ? "11" : "10"}
+                                                            fontSize={isActive ? "11.5" : "10"}
                                                             fontWeight="700"
                                                             fill={connectorColor}
                                                             textAnchor="middle"
                                                             dominantBaseline="central"
-                                                            style={{ transition: 'all 0.3s ease' }}
+                                                            style={{
+                                                                transition: 'all 0.3s ease',
+                                                                letterSpacing: isActive ? '0.3px' : '0px'
+                                                            }}
                                                         >
                                                             {conn.label}
                                                         </text>
