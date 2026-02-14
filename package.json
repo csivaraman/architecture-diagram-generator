@@ -9,8 +9,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest",
-    "server": "node server/index.js"
+    "test": "vitest --exclude '**/src/test/e2e/**'",
+    "server": "node server/index.js",
+    "test:e2e": "vitest run src/test/e2e",
+    "test:e2e:fresh": "NO_CACHE=true vitest run src/test/e2e",
+    "test:e2e:clear": "rm -rf src/test/cache && vitest run src/test/e2e",
+    "test:e2e:report": "vitest run src/test/e2e && open src/test/reports/e2e-report.html"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

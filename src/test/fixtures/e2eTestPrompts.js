@@ -1,0 +1,66 @@
+export const e2eTestPrompts = [
+    // AWS Prompts
+    "Simple S3 to Lambda to DynamoDB pipeline",
+    "Serverless web app with API Gateway, Lambda, and DynamoDB",
+    "Microservices on ECS with Fargate and ALB",
+    "RDS Aurora cluster with read replicas and ElastiCache",
+    "Big data pipeline with Kinesis, Glue, and Redshift",
+    "Machine learning workflow with SageMaker and S3",
+    "VPC with public/private subnets, NAT Gateway, and VPN",
+    "Security architecture with WAF, Shield, and GuardDuty",
+    "Storage gateway with S3 and Glacier for archival",
+    "IoT core processing with Kinesis Firehose and Timestream",
+    "Build a scalable e-commerce platform on AWS using API Gateway for request routing, Lambda functions for order processing and inventory management, DynamoDB for product catalog and user sessions, Aurora PostgreSQL for transactional data, S3 for product images, ElastiCache Redis for caching, SQS for order queue management, SNS for notifications, and CloudWatch for monitoring. Include Cognito for user authentication.",
+    "Design a real-time data analytics system on AWS with Kinesis Data Streams for event ingestion, Lambda for stream processing, S3 for data lake storage, Glue for ETL jobs, Athena for ad-hoc queries, Redshift for data warehousing, QuickSight for visualization, and CloudWatch for logging. Use Step Functions to orchestrate the pipeline.",
+    "Create a microservices architecture using EKS for container orchestration, ECR for container registry, Application Load Balancer for traffic distribution, RDS MySQL for relational data, DocumentDB for document storage, ElastiCache for session management, CloudFront for CDN, Route53 for DNS, and X-Ray for distributed tracing.",
+    "Build an IoT data processing platform with IoT Core for device connectivity, Lambda for data transformation, Kinesis Firehose for streaming to S3, DynamoDB for device metadata, Timestream for time-series data, SageMaker for ML predictions, SNS for alerts, and CloudWatch for monitoring device health.",
+    "Design an ML training and inference pipeline using SageMaker for model training, S3 for dataset storage, Lambda for preprocessing, API Gateway for model serving, DynamoDB for feature store, Step Functions for workflow orchestration, ECR for custom containers, and CloudWatch for model monitoring.",
+
+    // Azure Prompts
+    "Azure Web App with SQL Database and Redis Cache",
+    "Event-driven architecture with Azure Functions and Event Grid",
+    "Kubernetes cluster on AKS with Azure Container Registry",
+    "Global data distribution with Cosmos DB and Traffic Manager",
+    "Blob storage with CDN and Azure Cognitive Search",
+    "Integration workflow with Logic Apps and Service Bus",
+    "IoT Hub telemetery processing with Stream Analytics",
+    "Identity management with Azure AD and B2C",
+    "Build an enterprise web application on Azure using App Service for hosting, Azure Functions for background processing, Cosmos DB for global user profiles, SQL Database for transactional data, Blob Storage for media files, Service Bus for messaging, Azure Cache for Redis for session state, Application Insights for monitoring, and Active Directory for authentication.",
+    "Create a modern data platform with Azure Data Factory for ETL pipelines, Databricks for big data processing, Synapse Analytics for data warehousing, Blob Storage for data lake, Event Hubs for real-time ingestion, Stream Analytics for real-time processing, and Power BI for visualization. Include Key Vault for secrets management.",
+    "Design a cloud-native application using AKS for container orchestration, Container Registry for images, Application Gateway for ingress, Cosmos DB for distributed data, Azure Database for PostgreSQL for relational data, Service Bus for messaging, Azure Monitor for observability, and Azure DevOps for CI/CD pipelines.",
+    "Build a serverless event-driven system with Azure Functions for compute, Event Grid for event routing, Logic Apps for workflows, Cosmos DB for NoSQL storage, Blob Storage for files, Queue Storage for async processing, API Management for API gateway, and Application Insights for telemetry.",
+    "Create an AI platform using Azure Machine Learning for model training, Cognitive Services for pre-built AI, Bot Service for conversational AI, Blob Storage for training data, Cosmos DB for conversation history, Functions for inference endpoints, API Management for serving, and Monitor for performance tracking.",
+
+    // GCP Prompts
+    "Containerized app on Cloud Run with Firestore",
+    "GKE cluster with Cloud Build and Artifact Registry",
+    "Streaming analytics with Pub/Sub, Dataflow, and BigQuery",
+    "Cloud Functions triggered by Cloud Storage events",
+    "Cloud SQL with HA and Cloud Memcache",
+    "Vertex AI pipeline with Cloud Storage",
+    "Standard environment app with Cloud Tasks",
+    "Global load balancing with Cloud CDN and Armor",
+    "Design a microservices platform on GCP with Cloud Run for containerized services, Cloud Load Balancing for traffic distribution, Cloud SQL for PostgreSQL database, Firestore for real-time data, Cloud Storage for object storage, Pub/Sub for event streaming, Cloud Functions for event processing, and Cloud Monitoring for observability.",
+    "Build a data analytics pipeline using BigQuery for data warehouse, Dataflow for stream and batch processing, Pub/Sub for message ingestion, Cloud Storage for data lake, Dataproc for Spark jobs, Data Fusion for visual ETL, Looker for BI dashboards, and Cloud Logging for audit trails.",
+    "Create a gaming backend with Cloud Run for game servers, Memorystore Redis for session caching, Cloud Spanner for global leaderboards, Firestore for player profiles, Cloud Storage for game assets, Pub/Sub for matchmaking queue, Cloud Functions for notifications, and Cloud CDN for content delivery.",
+    "Design an ML platform using Vertex AI for model training and deployment, Cloud Storage for datasets, BigQuery for feature engineering, Dataflow for data preprocessing, Cloud Functions for inference triggers, Pub/Sub for prediction requests, and Cloud Monitoring for model performance tracking.",
+    "Build a real-time collaboration app with Cloud Run for API backend, Firebase Realtime Database for live sync, Cloud Firestore for structured data, Cloud Storage for file uploads, Cloud Functions for serverless logic, Firebase Authentication for users, Pub/Sub for notifications, and Cloud Trace for performance monitoring.",
+
+    // Multi-Cloud & Hybrid Prompts
+    "On-premise data center connected to AWS via Site-to-Site VPN",
+    "App on AWS using Google Cloud Storage for backup",
+    "Kubernetes clusters across Azure AKS and AWS EKS",
+    "On-prem legacy DB replicating to Cloud SQL",
+    "Data ingestion from Azure Event Hubs to BigQuery",
+    "Design a multi-cloud architecture with AWS S3 for primary storage, Azure Blob Storage for backup and disaster recovery, GCP BigQuery for analytics, AWS Lambda for data transformation, Azure Functions for replication logic, and GCP Cloud Monitoring for unified observability across clouds.",
+    "Create a hybrid e-commerce system with on-premises SQL Server for legacy order management, AWS RDS for new customer data, Azure Cosmos DB for global product catalog, GCP Cloud Storage for media assets, AWS API Gateway for public API, Azure Service Bus for inter-system messaging, and hybrid monitoring with CloudWatch and Azure Monitor.",
+    "Build a cross-cloud analytics platform with AWS Kinesis for data ingestion, Azure Event Hubs for additional streams, GCP BigQuery as central data warehouse, AWS Glue for ETL, Azure Data Factory for orchestration, GCP Looker for visualization, and unified logging with AWS CloudWatch and GCP Cloud Logging.",
+    "Design a globally distributed app with AWS in North America (Lambda, DynamoDB, CloudFront), Azure in Europe (App Service, Cosmos DB, Front Door), GCP in Asia (Cloud Run, Firestore, Cloud CDN), and Traffic Manager for global routing. Include AWS Route53 for DNS and cross-cloud replication.",
+    "Create a hybrid AI system with on-premises data centers for sensitive data, AWS SageMaker for model training, Azure Cognitive Services for pre-built AI capabilities, GCP Vertex AI for production inference, AWS S3 for model artifacts, Azure Blob for datasets, and unified monitoring across all environments.",
+
+    // Edge Cases Prompts
+    "Complex system with 20+ interconnected microservices",
+    "Circular dependency between three recursive services",
+    "Services with extremely long descriptions and names",
+    "Isolated components with no connections to main system"
+];

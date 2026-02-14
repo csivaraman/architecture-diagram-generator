@@ -69,10 +69,11 @@ class RateLimiter {
             if (fs.existsSync(this.storagePath)) {
                 const data = JSON.parse(fs.readFileSync(this.storagePath, 'utf8'));
                 if (data.usage) {
-                    // Restore usage if keys align
+                    // Restore usage if keys align, merging with defaults
                     this.apiKeys.forEach((_, index) => {
                         if (data.usage[index]) {
-                            this.usage[index] = data.usage[index];
+                            // Merge restored usage into current usage to preserve structure for new models
+                            this.usage[index] = { ...this.usage[index], ...data.usage[index] };
                         }
                     });
                 }
@@ -111,6 +112,7 @@ class RateLimiter {
     }
 
     resetCountersIfNeeded(keyIndex, model) {
+        if (!this.usage[keyIndex] || !this.usage[keyIndex][model]) return; // Guard
         const usage = this.usage[keyIndex][model];
         const now = Date.now();
         const midnightPT = this.getMidnightPT();
@@ -134,15 +136,21 @@ class RateLimiter {
 
     canMakeRequest(keyIndex, model, estimatedTokens = 2000) {
         this.resetCountersIfNeeded(keyIndex, model);
+        // Guard against missing model in usage (if config changed)
+        if (!this.usage[keyIndex] || !this.usage[keyIndex][model]) return false;
+
         const usage = this.usage[keyIndex][model];
         const limits = this.models[model];
+
+        // Handle null/undefined estimatedTokens by enforcing default
+        const tokens = estimatedTokens || 2000;
 
         const safeRPM = Math.floor(limits.rpm * this.SAFETY_FACTOR);
         const safeTPM = Math.floor(limits.tpm * this.SAFETY_FACTOR);
         const safeRPD = Math.floor(limits.rpd * this.SAFETY_FACTOR);
 
         if (usage.requestCount >= safeRPM) return false;
-        if (usage.tokenCount + estimatedTokens > safeTPM) return false;
+        if (usage.tokenCount + tokens > safeTPM) return false;
         if (usage.dailyCount >= safeRPD) return false;
 
         return true;

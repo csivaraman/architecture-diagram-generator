@@ -35,6 +35,7 @@ app.post('/api/generate-diagram', validateDiagramRequest, async (req, res) => {
         const result = await generateDiagram(systemDescription, instructions || '', provider, cloudProvider);
         res.status(200).json(result);
     } catch (error) {
+        console.error('[Generate Diagram Error]', error);
         res.status(500).json({
             success: false,
             error: error.message

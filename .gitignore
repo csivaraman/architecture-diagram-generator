@@ -120,6 +120,12 @@ dist
 # Mac
 .DS_Store
 
+# Test Artifacts
+src/test/cache/
+src/test/reports/
+test_output.log
+test_output.txt
+
 # Rate Limiter Stats
 rate_limiter_stats.json
 rate_limiter_stats_groq.json
