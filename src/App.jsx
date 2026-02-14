@@ -13,7 +13,8 @@ import {
     findBestLabelPosition,
     findClearLabelPosition,
     segmentPassesThroughComponent,
-    pathIntersectsObstacles
+    pathIntersectsObstacles,
+    measureLabelText
 } from './utils/diagramLayout';
 import TestRunner from './test/TestRunner.jsx';
 import { architectureTestCases } from './data/architectureTestCases';
@@ -600,14 +601,17 @@ const ArchitectureDiagramGenerator = () => {
                                             );
 
                                             const bestSegment = findBestLabelPosition(pathPoints);
-                                            const labelPos = findClearLabelPosition(pathPoints, bestSegment.index, diagram.components, placedLabels);
+                                            const labelDims = measureLabelText(conn.label);
+                                            const labelPos = findClearLabelPosition(pathPoints, bestSegment.index, diagram.components, placedLabels, labelDims.width, labelDims.height);
 
-                                            // Register label position (only for non-fallback cases if possible, but here we just push)
+                                            // Register label position with actual dimensions
+                                            const hw = labelDims.width / 2;
+                                            const hh = labelDims.height / 2;
                                             placedLabels.push({
-                                                left: labelPos.x - 45,
-                                                right: labelPos.x + 45,
-                                                top: labelPos.y - 13,
-                                                bottom: labelPos.y + 13
+                                                left: labelPos.x - hw,
+                                                right: labelPos.x + hw,
+                                                top: labelPos.y - hh,
+                                                bottom: labelPos.y + hh
                                             });
 
                                             const isAsync = conn.type === 'async';
@@ -664,7 +668,7 @@ const ArchitectureDiagramGenerator = () => {
                                                         </g>
                                                     ))}
 
-                                                    {/* Label */}
+                                                    {/* Label — auto-sized to fit text */}
                                                     <g
                                                         transform={`translate(${labelPos.x}, ${labelPos.y})`}
                                                         style={{
@@ -673,10 +677,10 @@ const ArchitectureDiagramGenerator = () => {
                                                         }}
                                                     >
                                                         <rect
-                                                            x="-45"
-                                                            y="-13"
-                                                            width="90"
-                                                            height="26"
+                                                            x={-hw}
+                                                            y={-hh}
+                                                            width={labelDims.width}
+                                                            height={labelDims.height}
                                                             fill="white"
                                                             rx="6"
                                                             stroke={connectorColor}

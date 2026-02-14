@@ -68,27 +68,27 @@ describe('Detailed Rule Validation', () => {
     // B. Label Placement Rules
     // =========================================================================
     describe('Label Placement Rules', () => {
-        it('should respect 40px arrow buffer (Rule B2)', () => {
+        it('should respect 35px arrow buffer (Rule B2)', () => {
             const pathPoints = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
-            const collidesNearStart = labelCollides(10, 0, pathPoints, [], []);
-            expect(collidesNearStart).toBe(true); // < 40px from start
+            const collidesNearStart = labelCollides(10, 0, pathPoints, [], [], 90, 26);
+            expect(collidesNearStart).toBe(true); // < 35px from start
 
-            const collidesFar = labelCollides(50, 0, pathPoints, [], []);
-            expect(collidesFar).toBe(false); // > 40px
+            const collidesFar = labelCollides(50, 0, pathPoints, [], [], 90, 26);
+            expect(collidesFar).toBe(false); // > 35px
         });
 
-        it('should respect 25px component buffer (Rule B3)', () => {
+        it('should respect 20px component buffer (Rule B3)', () => {
             const comp = { x: 100, y: 100, width: 100, height: 100 }; // Bounds: 50-150
             const components = [comp];
-            // Component bounds + 25 buffer = 25-175 range.
-            const collides = labelCollides(170, 100, [], components, []); // Inside buffer
+            // Component bounds + 20 buffer = 30-170 range.
+            const collides = labelCollides(170, 100, [], components, [], 90, 26); // Inside buffer
             expect(collides).toBe(true);
         });
 
         it('should try standard offsets (Rule B5)', () => {
             const pos = findClearLabelPosition([{ x: 0, y: 0 }, { x: 100, y: 0 }], 0, [], []);
-            // First horizontal preference is midY - 35
-            expect(pos.y).toBe(-35);
+            // First horizontal preference is midY - 30
+            expect(pos.y).toBe(-30);
         });
 
         it('should fallback to 70-140px search (Rule B7)', () => {

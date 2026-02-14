@@ -12,19 +12,19 @@ describe('Label Placement Rules', () => {
         ];
 
         it('should detect collision with component', () => {
-            expect(labelCollides(100, 100, [], components, placedLabels)).toBe(true);
+            expect(labelCollides(100, 100, [], components, placedLabels, 90, 26)).toBe(true);
         });
 
         it('should detect collision with component buffer', () => {
-            expect(labelCollides(180, 100, [], components, placedLabels)).toBe(true);
+            expect(labelCollides(180, 100, [], components, placedLabels, 90, 26)).toBe(true);
         });
 
         it('should detect collision with other labels', () => {
-            expect(labelCollides(250, 115, [], components, placedLabels)).toBe(true);
+            expect(labelCollides(250, 115, [], components, placedLabels, 90, 26)).toBe(true);
         });
 
         it('should allow placement in clear space', () => {
-            expect(labelCollides(400, 400, [], components, placedLabels)).toBe(false);
+            expect(labelCollides(400, 400, [], components, placedLabels, 90, 26)).toBe(false);
         });
     });
 

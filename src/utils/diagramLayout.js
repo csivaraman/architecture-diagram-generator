@@ -1,5 +1,21 @@
 import { getCloudIcon, getCloudBadge, normalizeServiceName } from './cloudIcons';
 
+/**
+ * Estimates label box dimensions from text content.
+ * Uses approximate character width for SVG font-size 10, weight 700.
+ * Returns { width, height } with padding included.
+ */
+export const measureLabelText = (text) => {
+    if (!text) return { width: 50, height: 26 };
+    const CHAR_WIDTH = 6.5;   // avg px per char at font-size 10, bold
+    const H_PADDING = 18;     // 9px each side
+    const MIN_WIDTH = 50;
+    const MAX_WIDTH = 180;
+    const height = 26;
+    const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, text.length * CHAR_WIDTH + H_PADDING));
+    return { width, height };
+};
+
 
 export const calculateConnectorPath = (start, end, fromEdge, toEdge, routeVariation, detourOffset, obstacles) => {
     let pathPoints = [];
@@ -332,18 +348,22 @@ export const getDistributedPoint = (comp, edge, index, total) => {
 };
 
 /**
- * Checks if a label overlaps with components, arrows, or other labels
+ * Checks if a label overlaps with components, arrows, or other labels.
+ * width and height are the actual label dimensions (from measureLabelText).
  */
-export const labelCollides = (x, y, pathPoints, components, placedLabels, width = 90, height = 26) => {
-    const COMPONENT_BUFFER = 25;
-    const ARROW_BUFFER = 40;
-    const LABEL_BUFFER = 8;
+export const labelCollides = (x, y, pathPoints, components, placedLabels, width, height) => {
+    const COMPONENT_BUFFER = 20;
+    const ARROW_BUFFER = 35;
+    const LABEL_BUFFER = 6;
+
+    const hw = width / 2;
+    const hh = height / 2;
 
     const labelBox = {
-        left: x - width / 2,
-        right: x + width / 2,
-        top: y - height / 2,
-        bottom: y + height / 2
+        left: x - hw,
+        right: x + hw,
+        top: y - hh,
+        bottom: y + hh
     };
 
     // Check if label is too close to arrow endpoints
@@ -351,8 +371,8 @@ export const labelCollides = (x, y, pathPoints, components, placedLabels, width 
         const startPoint = pathPoints[0];
         const endPoint = pathPoints[pathPoints.length - 1];
 
-        const distToStart = Math.sqrt(Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2));
-        const distToEnd = Math.sqrt(Math.pow(x - endPoint.x, 2) + Math.pow(y - endPoint.y, 2));
+        const distToStart = Math.sqrt((x - startPoint.x) ** 2 + (y - startPoint.y) ** 2);
+        const distToEnd = Math.sqrt((x - endPoint.x) ** 2 + (y - endPoint.y) ** 2);
 
         if (distToStart < ARROW_BUFFER || distToEnd < ARROW_BUFFER) {
             return true;
@@ -376,7 +396,7 @@ export const labelCollides = (x, y, pathPoints, components, placedLabels, width 
         }
     }
 
-    // Check collision with other labels
+    // Check collision with other placed labels
     for (const placed of placedLabels) {
         if (!(labelBox.right + LABEL_BUFFER < placed.left ||
             labelBox.left - LABEL_BUFFER > placed.right ||
@@ -410,78 +430,89 @@ export const findBestLabelPosition = (pathPoints) => {
     return longestSegment;
 };
 
-export const findClearLabelPosition = (pathPoints, segmentIndex, components, placedLabels) => {
-    const p1 = pathPoints[segmentIndex];
-    const p2 = pathPoints[segmentIndex + 1];
+/**
+ * Finds a collision-free position for a label along a connector path.
+ * Tries positions at 25%, 50%, 75% along every internal segment,
+ * with perpendicular offsets at increasing distances.
+ * @param {Array} pathPoints - the connector path points
+ * @param {number} segmentIndex - preferred segment (longest)
+ * @param {Array} components - all diagram components
+ * @param {Array} placedLabels - already placed label boxes
+ * @param {number} labelWidth - actual label width from measureLabelText
+ * @param {number} labelHeight - actual label height from measureLabelText
+ */
+export const findClearLabelPosition = (pathPoints, segmentIndex, components, placedLabels, labelWidth = 90, labelHeight = 26) => {
+    const hw = labelWidth / 2;
 
-    const midX = (p1.x + p2.x) / 2;
-    const midY = (p1.y + p2.y) / 2;
-
-    const isVertical = Math.abs(p1.x - p2.x) < 5;
-    const isHorizontal = Math.abs(p1.y - p2.y) < 5;
-
-    const positions = [];
-
-    if (isHorizontal) {
-        positions.push(
-            { x: midX, y: midY - 35 },
-            { x: midX, y: midY + 35 },
-            { x: midX, y: midY - 50 },
-            { x: midX, y: midY + 50 },
-            { x: midX - 70, y: midY - 35 },
-            { x: midX + 70, y: midY - 35 },
-            { x: midX - 70, y: midY + 35 },
-            { x: midX + 70, y: midY + 35 }
-        );
-    } else if (isVertical) {
-        positions.push(
-            { x: midX + 55, y: midY },
-            { x: midX - 55, y: midY },
-            { x: midX + 75, y: midY },
-            { x: midX - 75, y: midY },
-            { x: midX + 55, y: midY - 30 },
-            { x: midX - 55, y: midY - 30 },
-            { x: midX + 55, y: midY + 30 },
-            { x: midX - 55, y: midY + 30 }
-        );
-    } else {
+    // Generate candidate positions for a given segment
+    const getCandidates = (p1, p2) => {
+        const candidates = [];
+        const isVertical = Math.abs(p1.x - p2.x) < 5;
+        const isHorizontal = Math.abs(p1.y - p2.y) < 5;
         const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
         const perpAngle = angle + Math.PI / 2;
 
-        for (let dist of [40, 60, 80, 100]) {
-            positions.push(
-                {
-                    x: midX + Math.cos(perpAngle) * dist,
-                    y: midY + Math.sin(perpAngle) * dist
-                },
-                {
-                    x: midX - Math.cos(perpAngle) * dist,
-                    y: midY - Math.sin(perpAngle) * dist
+        // Sample at 25%, 50%, 75% along segment
+        for (const t of [0.5, 0.35, 0.65, 0.25, 0.75]) {
+            const mx = p1.x + (p2.x - p1.x) * t;
+            const my = p1.y + (p2.y - p1.y) * t;
+
+            if (isHorizontal) {
+                for (const dy of [-30, 30, -48, 48, -18]) {
+                    candidates.push({ x: mx, y: my + dy });
                 }
-            );
+            } else if (isVertical) {
+                for (const dx of [hw + 12, -(hw + 12), hw + 30, -(hw + 30)]) {
+                    candidates.push({ x: mx + dx, y: my });
+                }
+            } else {
+                for (const dist of [32, 50, 70]) {
+                    candidates.push(
+                        { x: mx + Math.cos(perpAngle) * dist, y: my + Math.sin(perpAngle) * dist },
+                        { x: mx - Math.cos(perpAngle) * dist, y: my - Math.sin(perpAngle) * dist }
+                    );
+                }
+            }
         }
+        return candidates;
+    };
+
+    // Build ordered list of segments to try: preferred first, then others
+    const segmentOrder = [segmentIndex];
+    for (let i = 1; i < pathPoints.length - 1; i++) {
+        if (i !== segmentIndex) segmentOrder.push(i);
     }
 
-    for (const pos of positions) {
-        if (!labelCollides(pos.x, pos.y, pathPoints, components, placedLabels)) {
-            return pos;
-        }
-    }
-
-    // Extended fallback
-    for (let offset = 70; offset <= 140; offset += 20) {
-        const fallbackPositions = isVertical
-            ? [{ x: midX + offset, y: midY }, { x: midX - offset, y: midY }]
-            : [{ x: midX, y: midY - offset }, { x: midX, y: midY + offset }];
-
-        for (const pos of fallbackPositions) {
-            if (!labelCollides(pos.x, pos.y, pathPoints, components, placedLabels)) {
+    // Try each segment's candidates
+    for (const si of segmentOrder) {
+        if (si < 0 || si + 1 >= pathPoints.length) continue;
+        const candidates = getCandidates(pathPoints[si], pathPoints[si + 1]);
+        for (const pos of candidates) {
+            if (!labelCollides(pos.x, pos.y, pathPoints, components, placedLabels, labelWidth, labelHeight)) {
                 return pos;
             }
         }
     }
 
-    return positions[0];
+    // Final fallback: try larger perpendicular offsets from the preferred segment midpoint
+    const p1 = pathPoints[segmentIndex];
+    const p2 = pathPoints[segmentIndex + 1];
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2;
+    const isVert = Math.abs(p1.x - p2.x) < 5;
+    for (let offset = 80; offset <= 160; offset += 20) {
+        const fallbacks = isVert
+            ? [{ x: mx + offset, y: my }, { x: mx - offset, y: my }]
+            : [{ x: mx, y: my - offset }, { x: mx, y: my + offset }];
+        for (const pos of fallbacks) {
+            if (!labelCollides(pos.x, pos.y, pathPoints, components, placedLabels, labelWidth, labelHeight)) {
+                return pos;
+            }
+        }
+    }
+
+    // Absolute fallback
+    return { x: mx, y: my - 35 };
 };
 
 export const segmentPassesThroughComponent = (x1, y1, x2, y2, comp) => {
