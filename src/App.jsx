@@ -345,7 +345,7 @@ const ArchitectureDiagramGenerator = () => {
                                 minWidth: '200px'
                             }}
                         >
-                            <option value="none">No Cloud Icons</option>
+                            <option value="none">Default</option>
                             <option value="aws">AWS Only</option>
                             <option value="azure">Azure Only</option>
                             <option value="gcp">GCP Only</option>
