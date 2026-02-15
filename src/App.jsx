@@ -636,19 +636,16 @@ const ArchitectureDiagramGenerator = () => {
                                             });
                                         });
 
-                                        // ── Clip all segments against ALL label bounds ───────────
-                                        const allLabelBounds = connectionData.map(cd => cd.labelBound);
-
-                                        connectionData.forEach(cd => {
-                                            cd.clippedSegments = clipSegmentsAroundLabels(cd.pathSegments, allLabelBounds);
-                                        });
+                                        // Two-layer rendering handles overlap via masking rects in Layer 2.
+                                        // No segment clipping needed — it caused broken connectors
+                                        // when long paths crossed multiple label areas.
 
                                         // ── Pass 2: Render in two layers ─────────────────────────
                                         return (
                                             <>
-                                                {/* Layer 1: All connector lines (clipped around labels) */}
+                                                {/* Layer 1: All connector lines */}
                                                 {connectionData.map(cd => {
-                                                    const { idx, conn, clippedSegments, pathSegments, connectorColor, isAsync } = cd;
+                                                    const { idx, conn, pathSegments, connectorColor, isAsync } = cd;
                                                     const isActive = activeConnection === idx;
                                                     const strokeWidth = isActive ? 4 : 2.5;
                                                     const opacity = isActive ? 1 : 0.85;
@@ -663,7 +660,7 @@ const ArchitectureDiagramGenerator = () => {
                                                             onMouseLeave={() => setActiveConnection(null)}
                                                             style={{ cursor: 'pointer', transition: 'all 0.3s ease' }}
                                                         >
-                                                            {clippedSegments.map((seg, segIdx) => (
+                                                            {pathSegments.map((seg, segIdx) => (
                                                                 <g key={`seg-${segIdx}`}>
                                                                     {/* Glow */}
                                                                     <line
@@ -683,7 +680,7 @@ const ArchitectureDiagramGenerator = () => {
                                                                         strokeWidth={strokeWidth}
                                                                         strokeDasharray={seg.dashed ? '8,4' : (isAsync ? '6,4' : 'none')}
                                                                         strokeLinecap="round"
-                                                                        markerEnd={segIdx === clippedSegments.length - 1 ? `url(#arrowhead-${idx % 8})` : 'none'}
+                                                                        markerEnd={segIdx === pathSegments.length - 1 ? `url(#arrowhead-${idx % 8})` : 'none'}
                                                                         style={{
                                                                             opacity,
                                                                             transition: 'all 0.3s ease',
