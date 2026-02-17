@@ -11,9 +11,16 @@ try {
 }
 
 const GENERATION_CONFIG_GEMINI = {
-    temperature: 0.7,
+    temperature: 0.5,
     maxOutputTokens: 4096,
+    topP: 0.95,
+    topK: 40,
+    responseMimeType: "application/json",
 };
+
+console.log("\n\n---------------------------------------------------");
+console.log("   🚀 DIAGRAM SERVICE LOADED (UPDATED LOGGING)   ");
+console.log("---------------------------------------------------\n\n");
 
 /**
  * Initialize RateLimiters
@@ -30,7 +37,7 @@ if (GEMINI_KEYS.length === 0) {
     console.error('[Diagram Service] No Gemini API keys found');
 }
 
-const geminiLimiter = new RateLimiter(GEMINI_KEYS); // Uses default Gemini config
+export const geminiLimiter = new RateLimiter(GEMINI_KEYS); // Uses default Gemini config
 
 const GROQ_KEYS = [
     process.env.GROQ_KEY_1,
@@ -46,7 +53,7 @@ const GROQ_CONFIG = {
     }
 };
 
-const groqLimiter = new RateLimiter(GROQ_KEYS, GROQ_CONFIG, 'rate_limiter_stats_groq.json');
+export const groqLimiter = new RateLimiter(GROQ_KEYS, GROQ_CONFIG, 'rate_limiter_stats_groq.json');
 
 /**
  * Standard system prompt for the architect
@@ -90,7 +97,9 @@ async function generateWithGemini(systemDescription, promptInstructions) {
     const prompt = `${DEFAULT_SYSTEM_PROMPT} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
     let lastError;
 
-    for (let attempt = 0; attempt < 10; attempt++) {
+    console.log(`[Gemini] Available models: ${geminiLimiter.getRecommendedModels().join(', ')}`);
+
+    for (let attempt = 0; attempt < 8; attempt++) {
         const available = await geminiLimiter.getKeyAndModel();
 
         if (!available) {
@@ -101,7 +110,16 @@ async function generateWithGemini(systemDescription, promptInstructions) {
         const apiKey = GEMINI_KEYS[keyIndex];
         const maskedKey = `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)} `;
 
-        console.log(`[Gemini Service] REQUEST: Key #${keyIndex + 1} (${maskedKey}) | Model: ${modelName} `);
+        const modelStats = geminiLimiter.getStats()[keyIndex][modelName];
+        const MAX_ATTEMPTS = 8;
+
+        console.log(
+            `[Gemini] 🚀 Attempt ${attempt + 1}/${MAX_ATTEMPTS} | ` +
+            `Key #${keyIndex + 1} (${maskedKey}) | ` +
+            `Model: ${modelName} | ` +
+            `Usage: ${modelStats.requestCount}/${Math.floor(geminiLimiter.models[modelName].rpm * 0.8)} RPM, ` +
+            `${modelStats.dailyCount}/${Math.floor(geminiLimiter.models[modelName].rpd * 0.8)} RPD`
+        );
 
         try {
             const genAI = new GoogleGenerativeAI(apiKey);
@@ -113,7 +131,15 @@ async function generateWithGemini(systemDescription, promptInstructions) {
 
             while (true) {
                 try {
+                    const startTime = Date.now();
                     result = await model.generateContent(prompt);
+                    const latency = Date.now() - startTime;
+                    console.log(
+                        `[Gemini] ✅ SUCCESS in ${latency}ms | ` +
+                        `Model: ${modelName} | ` +
+                        `Attempt: ${attempt + 1} | ` +
+                        `Quality: ${geminiLimiter.models[modelName].quality}`
+                    );
                     break;
                 } catch (reqErr) {
                     const msg = (reqErr.message || '') + (reqErr.toString() || '');
@@ -149,22 +175,34 @@ async function generateWithGemini(systemDescription, promptInstructions) {
 
         } catch (err) {
             lastError = err;
-            const errorMsg = err.message || '';
+            const errorMsg = (err.message || '') + (err.toString() || '');
             const keyId = keyIndex + 1;
 
+            if (errorMsg.includes('timeout')) {
+                console.warn(`[Gemini] ⏱️ Timeout for ${modelName}`);
+                geminiLimiter.reportModelFailure(modelName, keyIndex);
+                continue;
+            }
+
             if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('Rate limit')) {
-                console.warn(`[Gemini Service] Key #${keyId} | Model: ${modelName} hit rate limit.`);
+                console.warn(`[Gemini] 🚫 Rate limit hit for ${modelName}`);
                 geminiLimiter.reportQuotaExceeded(keyIndex, modelName);
                 continue;
             }
 
-            if (errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('supported')) {
-                console.warn(`[Gemini Service] Key #${keyId} | Model: ${modelName} not available.`);
-                geminiLimiter.reportQuotaExceeded(keyIndex, modelName);
+            if (errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('not supported')) {
+                console.warn(`[Gemini] ❌ Model ${modelName} not available (404)`);
+                geminiLimiter.markModelUnavailable(modelName);
                 continue;
             }
 
-            throw new Error(`Gemini generation failed: ${errorMsg}`);
+            if (errorMsg.includes('503') || errorMsg.includes('overloaded') || errorMsg.includes('Service Unavailable')) {
+                console.warn(`[Gemini] 🔄 Overloaded. Trying next...`);
+                geminiLimiter.reportModelFailure(modelName, keyIndex);
+                continue;
+            }
+
+            console.error(`[Gemini] Unhandled Error: ${errorMsg}`);
         }
     }
     throw new Error(`Gemini generation failed after multiple attempts. Last error: ${lastError?.message}`);
@@ -181,7 +219,9 @@ async function generateWithGroq(systemDescription, promptInstructions) {
     const prompt = `${DEFAULT_SYSTEM_PROMPT} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
     let lastError;
 
-    for (let attempt = 0; attempt < 10; attempt++) {
+    console.log(`[Groq] Available models: ${groqLimiter.getRecommendedModels().join(', ')}`);
+
+    for (let attempt = 0; attempt < 8; attempt++) {
         const available = await groqLimiter.getKeyAndModel();
 
         if (!available) {
@@ -192,9 +232,19 @@ async function generateWithGroq(systemDescription, promptInstructions) {
         const apiKey = GROQ_KEYS[keyIndex];
         const maskedKey = `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)} `;
 
-        console.log(`[Groq Service] REQUEST: Key #${keyIndex + 1} (${maskedKey}) | Model: ${modelName} `);
+        const modelStats = groqLimiter.getStats()[keyIndex][modelName];
+        const MAX_ATTEMPTS = 8;
+
+        console.log(
+            `[Groq] 🚀 Attempt ${attempt + 1}/${MAX_ATTEMPTS} | ` +
+            `Key #${keyIndex + 1} (${maskedKey}) | ` +
+            `Model: ${modelName} | ` +
+            `Usage: ${modelStats.requestCount}/${Math.floor(groqLimiter.models[modelName].rpm * 0.8)} RPM, ` +
+            `${modelStats.dailyCount}/${Math.floor(groqLimiter.models[modelName].rpd * 0.8)} RPD`
+        );
 
         try {
+            const startTime = Date.now();
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -208,10 +258,12 @@ async function generateWithGroq(systemDescription, promptInstructions) {
                         { role: 'user', content: `${promptInstructions}\n\nDescription: ${systemDescription}` }
                     ],
                     response_format: { type: 'json_object' },
-                    temperature: 0.7,
-                    max_tokens: 4096
+                    temperature: 0.5,
+                    max_tokens: 4096,
+                    top_p: 0.95
                 })
             });
+            const latency = Date.now() - startTime;
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -252,6 +304,13 @@ async function generateWithGroq(systemDescription, promptInstructions) {
 
             groqLimiter.recordRequest(keyIndex, modelName);
 
+            console.log(
+                `[Groq] ✅ SUCCESS in ${latency}ms | ` +
+                `Model: ${modelName} | ` +
+                `Attempt: ${attempt + 1} | ` +
+                `Quality: ${groqLimiter.models[modelName].quality}`
+            );
+
             return {
                 diagram: diagramData,
                 diagnostics: { keyId: keyIndex + 1, model: modelName, provider: 'groq' }
@@ -259,12 +318,39 @@ async function generateWithGroq(systemDescription, promptInstructions) {
 
         } catch (err) {
             lastError = err;
-            console.error(`[Groq Service] Error:`, err);
-            // If it wasn't a 429 caught above, we might still want to try next key if it's a network error
-            if (err.message.includes('fetch') || err.message.includes('network')) {
+            const errorMsg = (err.message || '') + (err.toString() || '');
+
+            if (errorMsg.includes('timeout')) {
+                console.warn(`[Groq] ⏱️ Timeout for ${modelName}`);
+                groqLimiter.reportModelFailure(modelName, keyIndex);
                 continue;
             }
-            // For other logic errors, maybe stop? But safer to try next combo
+
+            if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('Rate limit')) {
+                console.warn(`[Groq] 🚫 Rate limit hit for ${modelName}`);
+                groqLimiter.reportQuotaExceeded(keyIndex, modelName);
+                continue;
+            }
+
+            if (errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('not supported')) {
+                console.warn(`[Groq] ❌ Model ${modelName} not available (404)`);
+                groqLimiter.markModelUnavailable(modelName);
+                continue;
+            }
+
+            if (errorMsg.includes('503') || errorMsg.includes('overloaded') || errorMsg.includes('Service Unavailable')) {
+                console.warn(`[Groq] 🔄 Overloaded. Trying next...`);
+                groqLimiter.reportModelFailure(modelName, keyIndex);
+                continue;
+            }
+
+            // For fetch/network errors, try next
+            if (errorMsg.includes('fetch') || errorMsg.includes('network')) {
+                console.warn(`[Groq] 🌐 Network error. Retrying...`);
+                continue;
+            }
+
+            console.error(`[Groq Service] Unhandled Error:`, err);
             continue;
         }
     }
@@ -305,76 +391,13 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
         };
     }
 
-    // ✅ Inject Cloud Provider Specific Instructions
+    // ✅ OPTIMIZED: Concise cloud instructions
     const cloudInstructions = {
-        'aws': `
-        Analyze the system description and detect cloud services. For each cloud component:
-        
-        AWS Services (use exact names):
-        - Compute: Lambda, EC2, ECS, EKS, Fargate, Elastic Beanstalk
-        - Storage: S3, EBS, EFS, Glacier
-        - Database: DynamoDB, RDS, Aurora, ElastiCache, Redshift, DocumentDB
-        - Networking: API Gateway, CloudFront, Route53, VPC, ELB
-        - Messaging: SQS, SNS, Kinesis, EventBridge
-        - Analytics: Athena, EMR, Glue, QuickSight
-        - ML: SageMaker, Rekognition, Comprehend
-        - Security: IAM, Cognito, Secrets Manager, KMS, WAF
-        - DevOps: CodePipeline, CodeBuild, CodeDeploy
-        - Monitoring: CloudWatch, CloudFormation, CloudTrail
-        
-        Add these fields to components:
-        - "cloudProvider": "aws"
-        - "cloudService": exact service name from list above (e.g. "Lambda", "S3")
-        `,
-
-        'azure': `
-        Analyze the system description and detect cloud services. For each cloud component:
-        
-        Azure Services (use exact names):
-        - Compute: Virtual Machines, App Service, Functions, Container Instances, AKS
-        - Storage: Blob Storage, Files, Queue Storage, Table Storage
-        - Database: Cosmos DB, SQL Database, Database for MySQL, Database for PostgreSQL, Cache for Redis
-        - Networking: Virtual Network, Load Balancer, Application Gateway, CDN, Front Door
-        - Integration: Service Bus, Event Grid, Event Hubs, Logic Apps, API Management
-        - Analytics: Stream Analytics, Data Factory, Databricks, Synapse Analytics
-        - AI/ML: Cognitive Services, Machine Learning, Bot Service
-        - Security: Active Directory, Key Vault, Security Center
-        - DevOps: Azure DevOps, Pipelines
-        - Monitoring: Monitor, Application Insights
-        
-        Add these fields to components:
-        - "cloudProvider": "azure"
-        - "cloudService": exact service name from list above (e.g. "Functions", "Cosmos DB")
-        `,
-
-        'gcp': `
-        Analyze the system description and detect cloud services. For each cloud component:
-        
-        GCP Services (use exact names):
-        - Compute: Compute Engine, App Engine, Cloud Run, Cloud Functions, GKE
-        - Storage: Cloud Storage, Persistent Disk, Filestore
-        - Database: Cloud SQL, Cloud Spanner, Firestore, Bigtable, Memorystore
-        - Networking: Cloud CDN, Cloud Load Balancing, VPC, Cloud DNS
-        - Analytics: BigQuery, Dataflow, Dataproc, Pub/Sub
-        - AI/ML: Vertex AI, AutoML, Vision API, Natural Language
-        - Security: Cloud IAM, Secret Manager, KMS
-        - DevOps: Cloud Build, Artifact Registry
-        - Monitoring: Cloud Monitoring, Cloud Logging
-        
-        Add these fields to components:
-        - "cloudProvider": "gcp"
-        - "cloudService": exact service name from list above (e.g. "Cloud Run", "BigQuery")
-        `,
-
-        'auto': `
-        Analyze the system description to infer the preferred cloud provider.
-        If specific services (e.g., "S3", "Cosmos", "Pub/Sub") are mentioned, use that provider.
-        If generic terms are used, map them to the best matching service from AWS, Azure, or GCP.
-        
-        Explicitly set:
-        - "cloudProvider": "aws" | "azure" | "gcp"
-        - "cloudService": The specific service name (use standard names like "Lambda", "S3", "Functions")
-        `
+        'auto': `Detect cloud provider. 
+        'aws': For AWS components, add: "cloudProvider": "aws", "cloudService": "<service>" (Lambda, S3, DynamoDB, etc.).
+        'azure': For Azure components, add: "cloudProvider": "azure", "cloudService": "<service>" (Functions, Cosmos DB, etc.).
+        'gcp': For GCP components, add: "cloudProvider": "gcp", "cloudService": "<service>" (Cloud Run, BigQuery, etc.).`,
+        'none': ''
     };
 
     let selectedInstructions = cloudInstructions[cloudProvider] || cloudInstructions['auto'];

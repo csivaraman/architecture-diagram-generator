@@ -240,7 +240,7 @@ describe('RateLimiter', () => {
         it('should load previous usage on restart', () => {
             const mockData = {
                 usage: {
-                    '0': { 'gemini-1.5-pro': { requestCount: 99 } }
+                    '0': { 'gemini-2.0-flash-lite': { requestCount: 99 } }
                 }
             };
             fs.existsSync.mockReturnValue(true);
@@ -248,7 +248,7 @@ describe('RateLimiter', () => {
 
             rateLimiter = new RateLimiter(apiKeys);
             const stats = rateLimiter.getStats();
-            expect(stats[0]['gemini-1.5-pro'].requestCount).toBe(99);
+            expect(stats[0]['gemini-2.0-flash-lite'].requestCount).toBe(99);
         });
 
         it('should skip file writes in Vercel environment', () => {
@@ -262,7 +262,7 @@ describe('RateLimiter', () => {
         it('should maintain current key index tracking', () => {
             rateLimiter = new RateLimiter(apiKeys);
             rateLimiter.currentKeyIndex = 1;
-            rateLimiter.recordRequest(1, 'gemini-1.5-pro'); // Should increment to 2
+            rateLimiter.recordRequest(1, 'gemini-2.0-flash-lite'); // Should increment to 2
             expect(rateLimiter.currentKeyIndex).toBe(2);
         });
     });
@@ -353,12 +353,12 @@ describe('RateLimiter', () => {
 
         it('should track usage separately per key-model pair', () => {
             rateLimiter = new RateLimiter(['key1']);
-            rateLimiter.recordRequest(0, 'gemini-1.5-pro', 10);
-            rateLimiter.recordRequest(0, 'gemini-1.5-flash', 20);
+            rateLimiter.recordRequest(0, 'gemini-2.0-flash-lite', 10);
+            rateLimiter.recordRequest(0, 'gemini-2.5-flash-lite', 20);
 
             const stats = rateLimiter.getStats();
-            expect(stats[0]['gemini-1.5-pro'].requestCount).toBe(1);
-            expect(stats[0]['gemini-1.5-flash'].requestCount).toBe(1);
+            expect(stats[0]['gemini-2.0-flash-lite'].requestCount).toBe(1);
+            expect(stats[0]['gemini-2.5-flash-lite'].requestCount).toBe(1);
         });
 
         it('should support adding dynamic models via config', () => {
@@ -418,21 +418,21 @@ describe('RateLimiter', () => {
 
         it('should trigger daily reset when current midnight > last reset', () => {
             rateLimiter = new RateLimiter(apiKeys);
-            const usage = rateLimiter.usage[0]['gemini-1.5-pro'];
+            const usage = rateLimiter.usage[0]['gemini-2.0-flash-lite'];
             usage.dailyCount = 100;
             usage.lastResetDay = 0; // Way in the past
 
-            rateLimiter.resetCountersIfNeeded(0, 'gemini-1.5-pro');
+            rateLimiter.resetCountersIfNeeded(0, 'gemini-2.0-flash-lite');
             expect(usage.dailyCount).toBe(0);
         });
 
         it('should trigger minute reset after 60 seconds', () => {
             rateLimiter = new RateLimiter(apiKeys);
-            const usage = rateLimiter.usage[0]['gemini-1.5-pro'];
+            const usage = rateLimiter.usage[0]['gemini-2.0-flash-lite'];
             usage.requestCount = 10;
             usage.lastResetMinute = Date.now() - 61000;
 
-            rateLimiter.resetCountersIfNeeded(0, 'gemini-1.5-pro');
+            rateLimiter.resetCountersIfNeeded(0, 'gemini-2.0-flash-lite');
             expect(usage.requestCount).toBe(0);
         });
 
@@ -441,12 +441,12 @@ describe('RateLimiter', () => {
             rateLimiter._save = vi.fn();
 
             // No time passed
-            rateLimiter.resetCountersIfNeeded(0, 'gemini-1.5-pro');
+            rateLimiter.resetCountersIfNeeded(0, 'gemini-2.0-flash-lite');
             expect(rateLimiter._save).not.toHaveBeenCalled();
 
             // Advance time
             vi.advanceTimersByTime(61000);
-            rateLimiter.resetCountersIfNeeded(0, 'gemini-1.5-pro');
+            rateLimiter.resetCountersIfNeeded(0, 'gemini-2.0-flash-lite');
             expect(rateLimiter._save).toHaveBeenCalled();
         });
     });
@@ -482,7 +482,7 @@ describe('RateLimiter', () => {
             fs.reloadData(partialData);
 
             rateLimiter = new RateLimiter(apiKeys);
-            expect(rateLimiter.usage[0]['gemini-1.5-pro']).toBeDefined();
+            expect(rateLimiter.usage[0]['gemini-2.0-flash-lite']).toBeDefined();
         });
 
         it('should detect Vercel environment', () => {
@@ -526,8 +526,8 @@ describe('RateLimiter', () => {
             rateLimiter = new RateLimiter(apiKeys);
             fs.readFileSync.mockClear();
 
-            rateLimiter.recordRequest(0, 'gemini-1.5-pro');
-            rateLimiter.canMakeRequest(0, 'gemini-1.5-pro');
+            rateLimiter.recordRequest(0, 'gemini-2.0-flash-lite');
+            rateLimiter.canMakeRequest(0, 'gemini-2.0-flash-lite');
 
             expect(fs.readFileSync).not.toHaveBeenCalled();
         });
@@ -537,11 +537,11 @@ describe('RateLimiter', () => {
             rateLimiter._save = vi.fn();
 
             // Check doesn't save
-            rateLimiter.canMakeRequest(0, 'gemini-1.5-pro');
+            rateLimiter.canMakeRequest(0, 'gemini-2.0-flash-lite');
             expect(rateLimiter._save).not.toHaveBeenCalled();
 
             // Record does save
-            rateLimiter.recordRequest(0, 'gemini-1.5-pro');
+            rateLimiter.recordRequest(0, 'gemini-2.0-flash-lite');
             expect(rateLimiter._save).toHaveBeenCalled();
         });
 
@@ -581,9 +581,9 @@ describe('RateLimiter', () => {
 
         it('should reuse existing usage objects (Minimal Object Creation)', () => {
             rateLimiter = new RateLimiter(apiKeys);
-            const obj1 = rateLimiter.usage[0]['gemini-1.5-pro'];
-            rateLimiter.recordRequest(0, 'gemini-1.5-pro');
-            const obj2 = rateLimiter.usage[0]['gemini-1.5-pro'];
+            const obj1 = rateLimiter.usage[0]['gemini-2.0-flash-lite'];
+            rateLimiter.recordRequest(0, 'gemini-2.0-flash-lite');
+            const obj2 = rateLimiter.usage[0]['gemini-2.0-flash-lite'];
             expect(obj1).toBe(obj2); // Reference equality
         });
 
@@ -611,13 +611,13 @@ describe('RateLimiter', () => {
 
         it('should pre-validate request with canMakeRequest()', () => {
             rateLimiter = new RateLimiter(apiKeys);
-            expect(rateLimiter.canMakeRequest(0, 'gemini-1.5-pro')).toBe(true);
+            expect(rateLimiter.canMakeRequest(0, 'gemini-2.0-flash-lite')).toBe(true);
         });
 
         it('should support manual quota override via reportQuotaExceeded()', () => {
             rateLimiter = new RateLimiter(apiKeys);
-            rateLimiter.reportQuotaExceeded(0, 'gemini-1.5-pro');
-            expect(rateLimiter.canMakeRequest(0, 'gemini-1.5-pro')).toBe(false);
+            rateLimiter.reportQuotaExceeded(0, 'gemini-2.0-flash-lite');
+            expect(rateLimiter.canMakeRequest(0, 'gemini-2.0-flash-lite')).toBe(false);
         });
 
         it('should return Promise from getKeyAndModel() (Async Compatible)', async () => {

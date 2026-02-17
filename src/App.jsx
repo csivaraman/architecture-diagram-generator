@@ -346,10 +346,7 @@ const ArchitectureDiagramGenerator = () => {
                             }}
                         >
                             <option value="none">Default</option>
-                            <option value="aws">AWS Only</option>
-                            <option value="azure">Azure Only</option>
-                            <option value="gcp">GCP Only</option>
-                            <option value="hybrid">Multi-Cloud</option>
+                            <option value="auto">Cloud</option>
                         </select>
 
                         <select

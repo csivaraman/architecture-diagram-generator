@@ -18,7 +18,7 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'ec2': 'https://api.iconify.design/logos/aws-ec2.svg',
             'ecs': 'https://api.iconify.design/logos/aws-ecs.svg',
             'eks': 'https://api.iconify.design/logos/aws-eks.svg',
-            'ecr': 'https://api.iconify.design/logos/aws.svg',
+            'ecr': 'https://api.iconify.design/logos/aws-ecr.svg',
             'fargate': 'https://api.iconify.design/logos/aws-fargate.svg',
             'elastic beanstalk': 'https://api.iconify.design/logos/aws-elastic-beanstalk.svg',
             'batch': 'https://api.iconify.design/logos/aws-batch.svg',
@@ -93,13 +93,13 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'cloudsearch': 'https://api.iconify.design/logos/aws-cloudsearch.svg',
 
             // ML & Other
-            'sagemaker': 'https://api.iconify.design/logos/aws.svg',
-            'rekognition': 'https://api.iconify.design/logos/aws.svg',
+            'sagemaker': 'https://api.iconify.design/logos/aws-sagemaker.svg',
+            'rekognition': 'https://api.iconify.design/mdi/face-recognition.svg',
             'timestream': 'https://api.iconify.design/logos/aws-timestream.svg',
-            'iot core': 'https://api.iconify.design/logos/aws.svg',
+            'iot core': 'https://api.iconify.design/logos/aws-iot.svg',
             'x-ray': 'https://api.iconify.design/logos/aws-xray.svg',
             'xray': 'https://api.iconify.design/logos/aws-xray.svg',
-            'mediaconvert': 'https://api.iconify.design/logos/aws.svg',
+            'mediaconvert': 'https://api.iconify.design/logos/aws-elemental-mediaconvert.svg',
             'ses': 'https://api.iconify.design/logos/aws-ses.svg',
             'lightsail': 'https://api.iconify.design/logos/aws-lightsail.svg',
             'backup': 'https://api.iconify.design/logos/aws-backup.svg',
@@ -115,31 +115,31 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             // Compute
             'virtual machines': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'vm': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'app service': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'app service': 'https://api.iconify.design/logos/azure-app-service.svg',
             'functions': 'https://api.iconify.design/simple-icons/azurefunctions.svg',
-            'container instances': 'https://api.iconify.design/logos/docker-icon.svg',
+            'container instances': 'https://api.iconify.design/logos/azure-container-instances.svg',
             'aks': 'https://api.iconify.design/logos/kubernetes.svg',
             'kubernetes service': 'https://api.iconify.design/logos/kubernetes.svg',
-            'container registry': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'container registry': 'https://api.iconify.design/logos/azure-container-registry.svg',
             'batch': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'service fabric': 'https://api.iconify.design/logos/microsoft-azure.svg',
 
             // Storage
-            'blob storage': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'blob storage': 'https://api.iconify.design/logos/azure-storage.svg',
             'storage': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'files': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'queue storage': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'queue storage': 'https://api.iconify.design/logos/azure-queue-storage.svg',
             'table storage': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'disk storage': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'data lake storage': 'https://api.iconify.design/logos/microsoft-azure.svg',
 
             // Database
-            'cosmos db': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'cosmos db': 'https://api.iconify.design/logos/azure-cosmos-db.svg',
             'sql database': 'https://api.iconify.design/devicon/azuresqldatabase.svg',
             'database for mysql': 'https://api.iconify.design/logos/mysql-icon.svg',
             'database for postgresql': 'https://api.iconify.design/logos/postgresql.svg',
             'sql server': 'https://api.iconify.design/devicon/azuresqldatabase.svg',
-            'synapse analytics': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'synapse analytics': 'https://api.iconify.design/logos/azure-synapse-analytics.svg',
             'cache for redis': 'https://api.iconify.design/logos/redis.svg',
             'redis': 'https://api.iconify.design/logos/redis.svg',
 
@@ -147,41 +147,41 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'virtual network': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'vnet': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'load balancer': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'application gateway': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'application gateway': 'https://api.iconify.design/logos/azure-application-gateway.svg',
             'vpn gateway': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'cdn': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'traffic manager': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'traffic manager': 'https://api.iconify.design/logos/azure-traffic-manager.svg',
             'front door': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'firewall': 'https://api.iconify.design/logos/microsoft-azure.svg',
 
             // Integration
-            'service bus': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'event grid': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'event hubs': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'logic apps': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'api management': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'service bus': 'https://api.iconify.design/logos/azure-service-bus.svg',
+            'event grid': 'https://api.iconify.design/logos/azure-event-grid.svg',
+            'event hubs': 'https://api.iconify.design/logos/azure-event-hubs.svg',
+            'logic apps': 'https://api.iconify.design/logos/azure-logic-apps.svg',
+            'api management': 'https://api.iconify.design/logos/azure-api-management.svg',
 
             // Analytics
-            'stream analytics': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'stream analytics': 'https://api.iconify.design/logos/azure-stream-analytics.svg',
             'data factory': 'https://api.iconify.design/devicon/azuredatafactory.svg',
             'databricks': 'https://api.iconify.design/simple-icons/databricks.svg',
             'hdinsight': 'https://api.iconify.design/logos/microsoft-azure.svg',
 
             // AI + ML
-            'cognitive services': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'machine learning': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'bot service': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'cognitive services': 'https://api.iconify.design/logos/azure-cognitive-services.svg',
+            'machine learning': 'https://api.iconify.design/logos/azure-machine-learning.svg',
+            'bot service': 'https://api.iconify.design/logos/azure-bot-service.svg',
 
             // IoT
-            'iot hub': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'iot hub': 'https://api.iconify.design/mdi/router-wireless.svg',
             'digital twins': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'time series insights': 'https://api.iconify.design/logos/microsoft-azure.svg',
 
             // Security
-            'active directory': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'ad': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'key vault': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'security center': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'active directory': 'https://api.iconify.design/logos/azure-active-directory.svg',
+            'ad': 'https://api.iconify.design/logos/azure-active-directory.svg',
+            'key vault': 'https://api.iconify.design/logos/azure-key-vault.svg',
+            'security center': 'https://api.iconify.design/logos/azure-security-center.svg',
             'sentinel': 'https://api.iconify.design/logos/microsoft-azure.svg',
 
             // Healthcare
@@ -194,8 +194,8 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'artifacts': 'https://api.iconify.design/simple-icons/azureartifacts.svg',
 
             // Monitoring
-            'monitor': 'https://api.iconify.design/logos/microsoft-azure.svg',
-            'application insights': 'https://api.iconify.design/logos/microsoft-azure.svg',
+            'monitor': 'https://api.iconify.design/logos/azure-monitor.svg',
+            'application insights': 'https://api.iconify.design/logos/azure-application-insights.svg',
             'log analytics': 'https://api.iconify.design/logos/microsoft-azure.svg',
             'power bi': 'https://api.iconify.design/logos/microsoft-power-bi.svg',
 
@@ -219,7 +219,7 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'filestore': 'https://api.iconify.design/logos/google-cloud.svg',
 
             // Database
-            'cloud sql': 'https://api.iconify.design/logos/google-cloud.svg',
+            'cloud sql': 'https://api.iconify.design/logos/google-cloud-sql.svg',
             'cloud spanner': 'https://api.iconify.design/simple-icons/googlecloudspanner.svg',
             'firestore': 'https://api.iconify.design/logos/firebase.svg',
             'bigtable': 'https://api.iconify.design/simple-icons/googlebigtable.svg',
@@ -228,12 +228,12 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'realtime database': 'https://api.iconify.design/logos/firebase.svg',
 
             // Networking
-            'cloud cdn': 'https://api.iconify.design/logos/google-cloud.svg',
-            'cloud load balancing': 'https://api.iconify.design/logos/google-cloud.svg',
+            'cloud cdn': 'https://api.iconify.design/logos/google-cloud-cdn.svg',
+            'cloud load balancing': 'https://api.iconify.design/logos/google-cloud-load-balancing.svg',
             'vpc': 'https://api.iconify.design/logos/google-cloud.svg',
             'cloud dns': 'https://api.iconify.design/logos/google-cloud.svg',
             'cloud nat': 'https://api.iconify.design/logos/google-cloud.svg',
-            'cloud armor': 'https://api.iconify.design/logos/google-cloud.svg',
+            'cloud armor': 'https://api.iconify.design/mdi/shield-check.svg',
 
             // Analytics
             'bigquery': 'https://api.iconify.design/simple-icons/googlebigquery.svg',
@@ -242,27 +242,27 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'pub/sub': 'https://api.iconify.design/simple-icons/googlepubsub.svg',
             'pubsub': 'https://api.iconify.design/simple-icons/googlepubsub.svg',
             'composer': 'https://api.iconify.design/simple-icons/googlecloudcomposer.svg',
-            'data fusion': 'https://api.iconify.design/logos/google-cloud.svg',
+            'data fusion': 'https://api.iconify.design/logos/google-cloud-data-fusion.svg',
             'looker': 'https://api.iconify.design/simple-icons/looker.svg',
 
             // AI & ML
-            'vertex ai': 'https://api.iconify.design/logos/google-cloud.svg',
+            'vertex ai': 'https://api.iconify.design/logos/google-cloud-vertex-ai.svg',
             'ai platform': 'https://api.iconify.design/logos/google-cloud.svg',
             'automl': 'https://api.iconify.design/logos/google-cloud.svg',
             'vision api': 'https://api.iconify.design/logos/google-cloud.svg',
             'natural language': 'https://api.iconify.design/logos/google-cloud.svg',
 
             // Security
-            'cloud iam': 'https://api.iconify.design/logos/google-cloud.svg',
-            'iam': 'https://api.iconify.design/logos/google-cloud.svg',
-            'secret manager': 'https://api.iconify.design/logos/google-cloud.svg',
-            'kms': 'https://api.iconify.design/logos/google-cloud.svg',
+            'cloud iam': 'https://api.iconify.design/logos/google-cloud-iam.svg',
+            'iam': 'https://api.iconify.design/logos/google-cloud-iam.svg',
+            'secret manager': 'https://api.iconify.design/logos/google-cloud-secret-manager.svg',
+            'kms': 'https://api.iconify.design/logos/google-cloud-kms.svg',
             'cloud audit logs': 'https://api.iconify.design/logos/google-cloud.svg',
 
             // Monitoring
-            'cloud monitoring': 'https://api.iconify.design/logos/google-cloud.svg',
-            'cloud logging': 'https://api.iconify.design/logos/google-cloud.svg',
-            'cloud trace': 'https://api.iconify.design/logos/google-cloud.svg',
+            'cloud monitoring': 'https://api.iconify.design/logos/google-cloud-monitoring.svg',
+            'cloud logging': 'https://api.iconify.design/logos/google-cloud-logging.svg',
+            'cloud trace': 'https://api.iconify.design/logos/google-cloud-trace.svg',
 
             // Developer Tools
             'cloud build': 'https://api.iconify.design/logos/google-cloud.svg',

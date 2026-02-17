@@ -21,24 +21,80 @@ class RateLimiter {
         } else {
             // Priority order for models
             this.modelPriority = [
-                'gemini-3-flash-preview',
-                'gemini-2.5-flash-lite',
-                'gemini-2.0-flash-lite',
-                'gemini-flash-lite-latest',
-                'gemini-2.5-flash',
-                'gemini-1.5-flash',
-                'gemini-1.5-pro'
+                // Tier 1: Best available (fresh + excellent limits)
+                'gemini-2.0-flash-lite',      // #1: 15 RPM, Unlimited, 1500 RPD (BEST)
+
+                // Tier 2: Good capacity remaining
+                'gemini-2.5-flash-lite',      // #2: 10 RPM , 250K, 20 RPD 
+
+                // Tier 3: Good quality but currently exhausted (will reset at midnight PT)
+                'gemini-3-flash',             // #3: 5 RPM, 250K, 20 RPD
+
+                // Tier 4: Experimental but excellent limits
+                'gemini-2.0-flash-exp',       // #4: 15 RPM, Unlimited, 1500 RPD
+
+                // Tier 5: Stable balanced option
+                'gemini-2.0-flash',           // #5: 15 RPM, Unlimited, 1500 RPD
+
+                // Tier 6: Higher quality fallback
+                'gemini-2.5-flash'            // #6: 5 RPM, 250K, 20 RPD
             ];
 
             // Model configurations
             this.models = {
-                'gemini-3-flash-preview': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' },
-                'gemini-2.5-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
-                'gemini-2.0-flash-lite': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
-                'gemini-flash-lite-latest': { rpm: 15, tpm: 250000, rpd: 20, quality: 'medium' },
-                'gemini-2.5-flash': { rpm: 10, tpm: 250000, rpd: 20, quality: 'high' },
-                'gemini-1.5-flash': { rpm: 15, tpm: 1000000, rpd: 1500, quality: 'high' },
-                'gemini-1.5-pro': { rpm: 2, tpm: 32000, rpd: 50, quality: 'ultra' }
+                'gemini-2.0-flash-lite': {
+                    rpm: 15,
+                    tpm: 999999999,   // Unlimited (represented as large number)
+                    rpd: 1500,
+                    quality: 'medium',
+                    avgLatency: 3000,
+                    maxLatency: 8000
+                },
+
+                'gemini-2.5-flash-lite': {
+                    rpm: 10,
+                    tpm: 250000,
+                    rpd: 20,
+                    quality: 'medium',
+                    avgLatency: 3500,
+                    maxLatency: 9000
+                },
+
+                'gemini-3-flash': {
+                    rpm: 5,            // Your actual limit
+                    tpm: 250000,       // Your actual limit
+                    rpd: 20,           // Your actual limit (currently 23/20, will reset)
+                    quality: 'high',   // Gemini 3 has good quality
+                    avgLatency: 4000,
+                    maxLatency: 10000
+                },
+
+                'gemini-2.0-flash-exp': {
+                    rpm: 15,
+                    tpm: 999999999,
+                    rpd: 1500,
+                    quality: 'medium',
+                    avgLatency: 4000,
+                    maxLatency: 10000
+                },
+
+                'gemini-2.0-flash': {
+                    rpm: 15,
+                    tpm: 999999999,
+                    rpd: 1500,
+                    quality: 'high',
+                    avgLatency: 4500,
+                    maxLatency: 11000
+                },
+
+                'gemini-2.5-flash': {
+                    rpm: 5,
+                    tpm: 250000,
+                    rpd: 20,
+                    quality: 'high',
+                    avgLatency: 5500,
+                    maxLatency: 13000
+                }
             };
         }
 
@@ -177,6 +233,63 @@ class RateLimiter {
         this._save();
     }
 
+    markModelUnavailable(model) {
+        // Mark as exhausted for all keys if model is 404/unsupported
+        this.apiKeys.forEach((_, idx) => {
+            if (this.usage[idx] && this.usage[idx][model]) {
+                const limits = this.models[model];
+                this.usage[idx][model].dailyCount = limits.rpd + 1;
+            }
+        });
+        this._save();
+    }
+
+    reportModelFailure(model) {
+        // Mark current attempt as failed/exhausted to force rotation
+        // The last used key is (currentKeyIndex - 1) because recordRequest increments it.
+        // But here we are IN the loop, recordRequest hasn't been called yet?
+        // Wait, recordRequest is called on success.
+        // So currentIndex points to the NEXT eligible key *if* we loop?
+        // Actually findAvailableKeyAndModel doesn't change currentKeyIndex.
+        // So currentKeyIndex IS the one we just tried? 
+        // No, findAvailableKeyAndModel iterates (current + i). 
+        // We need the keyIndex that was actually used. 
+        // But reportModelFailure doesn't have keyIndex argument in the user snippet!
+        // We'll have to rely on `markModelUnavailable` logic but scoped to... well, without keyIndex we can't be precise.
+        // Let's assume the user meant to pass keyIndex or we just penalize the model globally for a moment?
+        // Or better, since we can't change the signature in the user's snippet, we just do a best effort.
+        // Let's implement it to penalize the model for ALL keys for a short burst?
+        // Or... wait. `diagram.js` HAS `keyIndex` in scope.
+        // Maybe I should update diagram.js to PASS keyIndex?
+        // The user snippet: `geminiLimiter.reportModelFailure(modelName);`
+        // I should PROBABLY update the user's snippet to pass keyIndex if possible, OR
+        // I'll implementation `reportModelFailure` to use `this.currentKeyIndex` which might be close enough?
+        // `findAvailableKeyAndModel` does NOT update `this.currentKeyIndex`.
+        // Only `recordRequest` updates it.
+        // So `this.currentKeyIndex` is the starting point of the search.
+        // The returned `keyIndex` from `findAvailableKeyAndModel` could be anything.
+        // Without `keyIndex`, I can't know which key failed.
+        // So I will just implement it as "mark unavailable for all keys" to be safe? 
+        // No, that kills the model for everyone on a single 503.
+        // I will change the method signature in `diagram.js` to pass keyIndex, and update it here too.
+
+        // Actually, for now, I'll insert a placeholder that logs a warning about missing keyIndex if not provided,
+        // but since I'm editing `diagram.js` anyway, I will FIX the call there.
+
+        // Implementing with keyIndex argument support (optional)
+    }
+
+    // Rethinking: I'll implement `reportModelFailure` to take `keyIndex` and update `diagram.js` to pass it.
+
+    reportModelFailure(model, keyIndex = -1) {
+        if (keyIndex === -1) {
+            // Fallback: penalize all?
+            this.markModelUnavailable(model);
+            return;
+        }
+        this.reportQuotaExceeded(keyIndex, model);
+    }
+
     recordRequest(keyIndex, model, tokensUsed = 2000) {
         this.resetCountersIfNeeded(keyIndex, model);
         const usage = this.usage[keyIndex][model];
@@ -191,8 +304,56 @@ class RateLimiter {
         return this.findAvailableKeyAndModel(estimatedTokens);
     }
 
+    getRecommendedModels() {
+        return this.modelPriority;
+    }
+
     getStats() {
         return this.usage;
+    }
+
+    get modelHealth() {
+        // Evaluate health based on recent errors or availability
+        // Since we don't track detailed error rates per model globally (only per key),
+        // we'll aggregate availability. If a model is exhausted on ALL keys, it's "Unhealthy".
+        const health = {};
+        this.modelPriority.forEach(model => {
+            let availableKeys = 0;
+            let totalKeys = this.apiKeys.length;
+
+            for (let i = 0; i < totalKeys; i++) {
+                if (this.usage[i] && this.usage[i][model]) {
+                    const usage = this.usage[i][model];
+                    const limits = this.models[model];
+                    // Check if daily limit reached
+                    if (usage.dailyCount < limits.rpd) {
+                        availableKeys++;
+                    }
+                }
+            }
+
+            health[model] = {
+                status: availableKeys > 0 ? 'Operational' : 'Degraded',
+                availableKeys: `${availableKeys}/${totalKeys}`,
+                flagged: availableKeys === 0
+            };
+        });
+        return health;
+    }
+
+    get performanceStats() {
+        // Return static stats for now or derived if we had history.
+        // User snippet expects an object.
+        const stats = {};
+        this.modelPriority.forEach(model => {
+            const config = this.models[model];
+            stats[model] = {
+                avgLatency: config.avgLatency,
+                p95Latency: config.maxLatency, // Approximation
+                qualityScore: config.quality
+            };
+        });
+        return stats;
     }
 }
 
