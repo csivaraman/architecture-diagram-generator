@@ -90,11 +90,72 @@ Your response must have this exact structure:
                 ]
 } `;
 
+const CLOUD_SYSTEM_PROMPT = `
+You are an expert cloud architect. Generate a technical architecture diagram in JSON format.
+
+Your response must follow this exact structure:
+
+{
+  "systemName": "Short descriptive title",
+  "cloudProvider": "aws" | "azure" | "gcp" | "multi",
+  "components": [
+    {
+      "id": "unique-id",
+      "name": "Component Name",
+      "type": "user|frontend|backend|database|cache|queue|api|service|external",
+      "description": "Brief description",
+      "technologies": ["tech1"],
+      "cloudProvider": "aws",
+      "cloudService": "Lambda",      // exact service name
+      "groupId": "group-vpc-1"       // which boundary group this belongs to
+    }
+  ],
+  "connections": [
+    {
+      "from": "component-id",
+      "to": "component-id",
+      "label": "HTTPS",
+      "type": "sync|async|bidirectional"
+    }
+  ],
+  "layers": [
+    { "name": "Client|Application|Data", "componentIds": ["id1"] }
+  ],
+  "groups": [
+    {
+      "id": "group-region-1",
+      "name": "AWS Region (us-east-1)",
+      "groupType": "region",          // region | vpc | subnet | az | security_group | resource_group | project
+      "cloudProvider": "aws",
+      "parentGroupId": null,          // null = top level, or ID of parent group
+      "componentIds": ["id1", "id2"], // components directly in this group
+      "childGroupIds": ["group-vpc-1"]
+    },
+    {
+      "id": "group-vpc-1",
+      "name": "Amazon VPC",
+      "groupType": "vpc",
+      "cloudProvider": "aws",
+      "parentGroupId": "group-region-1",
+      "componentIds": ["id3", "id4"],
+      "childGroupIds": []
+    }
+  ]
+}
+
+IMPORTANT GROUPING RULES:
+- For AWS: use groupTypes: region, vpc, subnet, az, security_group
+- For Azure: use groupTypes: subscription, resource_group, vnet, subnet
+- For GCP: use groupTypes: project, vpc, subnet, region, zone
+- Every component must be assigned to exactly one group via groupId
+- Groups can be nested via parentGroupId/childGroupIds
+`;
+
 /**
- * wrapper for Gemini generation
+ * wrappers for Gemini generation
  */
-async function generateWithGemini(systemDescription, promptInstructions) {
-    const prompt = `${DEFAULT_SYSTEM_PROMPT} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
+async function generateWithGemini(systemDescription, promptInstructions, systemPrompt = DEFAULT_SYSTEM_PROMPT) {
+    const prompt = `${systemPrompt} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
     let lastError;
 
     console.log(`[Gemini] Available models: ${geminiLimiter.getRecommendedModels().join(', ')}`);
@@ -211,12 +272,12 @@ async function generateWithGemini(systemDescription, promptInstructions) {
 /**
  * wrapper for Groq generation
  */
-async function generateWithGroq(systemDescription, promptInstructions) {
+async function generateWithGroq(systemDescription, promptInstructions, systemPrompt = DEFAULT_SYSTEM_PROMPT) {
     if (GROQ_KEYS.length === 0) {
         throw new Error('No Groq API keys configured.');
     }
 
-    const prompt = `${DEFAULT_SYSTEM_PROMPT} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
+    const prompt = `${systemPrompt} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
     let lastError;
 
     console.log(`[Groq] Available models: ${groqLimiter.getRecommendedModels().join(', ')}`);
@@ -254,7 +315,7 @@ async function generateWithGroq(systemDescription, promptInstructions) {
                 body: JSON.stringify({
                     model: modelName,
                     messages: [
-                        { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
+                        { role: 'system', content: systemPrompt },
                         { role: 'user', content: `${promptInstructions}\n\nDescription: ${systemDescription}` }
                     ],
                     response_format: { type: 'json_object' },
@@ -396,7 +457,8 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
         'auto': `Detect cloud provider. 
         'aws': For AWS components, add: "cloudProvider": "aws", "cloudService": "<service>" (Lambda, S3, DynamoDB, etc.).
         'azure': For Azure components, add: "cloudProvider": "azure", "cloudService": "<service>" (Functions, Cosmos DB, etc.).
-        'gcp': For GCP components, add: "cloudProvider": "gcp", "cloudService": "<service>" (Cloud Run, BigQuery, etc.).`,
+        'gcp': For GCP components, add: "cloudProvider": "gcp", "cloudService": "<service>" (Cloud Run, BigQuery, etc.).
+        IMPORTANT: You MUST organize components into hierarchical groups (e.g., Region > VPC > Subnet) using the 'groups' array and 'groupId' on components.`,
         'none': ''
     };
 
@@ -406,11 +468,13 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
 
     const fullInstructions = `${promptInstructions}\n\n${selectedInstructions}`;
 
+    const systemPrompt = (cloudProvider !== 'none') ? CLOUD_SYSTEM_PROMPT : DEFAULT_SYSTEM_PROMPT;
+
     let result;
     if (provider === 'groq') {
-        result = await generateWithGroq(systemDescription, fullInstructions);
+        result = await generateWithGroq(systemDescription, fullInstructions, systemPrompt);
     } else {
-        result = await generateWithGemini(systemDescription, fullInstructions);
+        result = await generateWithGemini(systemDescription, fullInstructions, systemPrompt);
     }
 
     setCachedDiagram(cacheKey, result.diagram);

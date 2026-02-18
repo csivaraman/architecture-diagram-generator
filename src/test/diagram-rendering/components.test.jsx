@@ -26,14 +26,23 @@ describe('Component Rendering Rules', () => {
 
         it('should normalize Azure service names', () => {
             expect(normalizeServiceName('Azure SQL')).toBe('sql database');
-            expect(normalizeServiceName('Microsoft Azure Blob Storage')).toBe('blob storage');
+            expect(normalizeServiceName('Microsoft Azure Blob Storage')).toBe('storage accounts');
+            expect(normalizeServiceName('Event Grid')).toBe('event grid topics');
+            expect(normalizeServiceName('Queue Storage')).toBe('queue storage');
         });
 
         it('should return correct icon URL', () => {
-            // We rely on the verified URLs in the util.
-            // Just check it returns a string for known service.
-            const url = getCloudIcon('aws', 'lambda');
-            expect(url).toContain('iconify.design');
+            // AWS Lambda should map to local file
+            const awsUrl = getCloudIcon('aws', 'lambda');
+            expect(awsUrl).toContain('/cloud-icons/aws/');
+
+            // Azure VM should map to local file
+            const azureUrl = getCloudIcon('azure', 'virtual machine');
+            expect(azureUrl).toContain('/cloud-icons/azure/');
+
+            // Unknown service should fallback to default iconify
+            const unknownUrl = getCloudIcon('aws', 'unknown-service-xyz');
+            expect(unknownUrl).toContain('iconify.design');
         });
 
         it('should return null for unknown provider', () => {

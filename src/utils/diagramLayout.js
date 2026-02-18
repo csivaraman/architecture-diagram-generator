@@ -17,9 +17,31 @@ export const measureLabelText = (text) => {
 };
 
 
-export const calculateConnectorPath = (start, end, fromEdge, toEdge, routeVariation, detourOffset, obstacles) => {
+export const calculateConnectorPath = (
+    start,
+    end,
+    fromEdge,
+    toEdge,
+    routeVariation = 0,
+    detourOffset = 40,
+    obstacles = [],
+    startDim = { width: 0, height: 0 },
+    endDim = { width: 0, height: 0 }
+) => {
     let pathPoints = [];
 
+    // Calculate effective offsets based on dimensions + clearance
+    // If dims are 0 (Edge-based like Legacy), margin is just the constant 40.
+    // If dims > 0 (Center-based like Cloud), margin is half-dim + 40.
+    const START_MARGIN = 40;
+    const END_MARGIN = 40;
+
+    const startOffsetX = (startDim.width > 0 ? startDim.width / 2 : 0) + START_MARGIN;
+    const startOffsetY = (startDim.height > 0 ? startDim.height / 2 : 0) + START_MARGIN;
+    const endOffsetX = (endDim.width > 0 ? endDim.width / 2 : 0) + END_MARGIN;
+    const endOffsetY = (endDim.height > 0 ? endDim.height / 2 : 0) + END_MARGIN;
+
+    // 1. Calculate the conceptual center-to-center path first
     if (fromEdge === 'bottom' && toEdge === 'top') {
         const midY = (start.y + end.y) / 2 + routeVariation;
         let directPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
@@ -30,10 +52,10 @@ export const calculateConnectorPath = (start, end, fromEdge, toEdge, routeVariat
             const detourX = (start.x + end.x) / 2 + detourOffset;
             pathPoints = [
                 start,
-                { x: start.x, y: start.y + 40 },
-                { x: detourX, y: start.y + 40 },
-                { x: detourX, y: end.y - 40 },
-                { x: end.x, y: end.y - 40 },
+                { x: start.x, y: start.y + startOffsetY },
+                { x: detourX, y: start.y + startOffsetY },
+                { x: detourX, y: end.y - endOffsetY },
+                { x: end.x, y: end.y - endOffsetY },
                 end
             ];
         }
@@ -47,10 +69,10 @@ export const calculateConnectorPath = (start, end, fromEdge, toEdge, routeVariat
             const detourX = (start.x + end.x) / 2 + detourOffset;
             pathPoints = [
                 start,
-                { x: start.x, y: start.y - 40 },
-                { x: detourX, y: start.y - 40 },
-                { x: detourX, y: end.y + 40 },
-                { x: end.x, y: end.y + 40 },
+                { x: start.x, y: start.y - startOffsetY },
+                { x: detourX, y: start.y - startOffsetY },
+                { x: detourX, y: end.y + endOffsetY },
+                { x: end.x, y: end.y + endOffsetY },
                 end
             ];
         }
@@ -61,14 +83,14 @@ export const calculateConnectorPath = (start, end, fromEdge, toEdge, routeVariat
         if (!pathIntersectsObstacles(directPath, obstacles)) {
             pathPoints = directPath;
         } else {
-            const horizontalDetourOffset = (detourOffset / 90) * 70;
+            const horizontalDetourOffset = (detourOffset / 90) * 70; // approx
             const detourY = (start.y + end.y) / 2 + horizontalDetourOffset;
             pathPoints = [
                 start,
-                { x: start.x + 40, y: start.y },
-                { x: start.x + 40, y: detourY },
-                { x: end.x - 40, y: detourY },
-                { x: end.x - 40, y: end.y },
+                { x: start.x + startOffsetX, y: start.y },
+                { x: start.x + startOffsetX, y: detourY },
+                { x: end.x - endOffsetX, y: detourY },
+                { x: end.x - endOffsetX, y: end.y },
                 end
             ];
         }
@@ -79,14 +101,14 @@ export const calculateConnectorPath = (start, end, fromEdge, toEdge, routeVariat
         if (!pathIntersectsObstacles(directPath, obstacles)) {
             pathPoints = directPath;
         } else {
-            const horizontalDetourOffset = (detourOffset / 90) * 70;
+            const horizontalDetourOffset = (detourOffset / 90) * 70; // approx
             const detourY = (start.y + end.y) / 2 + horizontalDetourOffset;
             pathPoints = [
                 start,
-                { x: start.x - 40, y: start.y },
-                { x: start.x - 40, y: detourY },
-                { x: end.x + 40, y: detourY },
-                { x: end.x + 40, y: end.y },
+                { x: start.x - startOffsetX, y: start.y },
+                { x: start.x - startOffsetX, y: detourY },
+                { x: end.x + endOffsetX, y: detourY },
+                { x: end.x + endOffsetX, y: end.y },
                 end
             ];
         }
@@ -99,6 +121,39 @@ export const calculateConnectorPath = (start, end, fromEdge, toEdge, routeVariat
         } else {
             pathPoints = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
         }
+    }
+
+    // 2. Adjust Start and End points to be at component boundaries relative to center
+    // Only if dimensions are provided (width/height > 0)
+    if (startDim.width > 0 && startDim.height > 0 && pathPoints.length > 1) {
+        const p0 = pathPoints[0];
+        let newStart = { ...p0 };
+        if (fromEdge === 'right') newStart.x += startDim.width / 2;
+        else if (fromEdge === 'left') newStart.x -= startDim.width / 2;
+        else if (fromEdge === 'bottom') newStart.y += startDim.height / 2;
+        else if (fromEdge === 'top') newStart.y -= startDim.height / 2;
+
+        pathPoints[0] = newStart;
+    }
+
+    if (endDim.width > 0 && endDim.height > 0 && pathPoints.length > 1) {
+        const lastIdx = pathPoints.length - 1;
+        const pLast = pathPoints[lastIdx];
+        let newEnd = { ...pLast };
+
+        if (toEdge === 'right') newEnd.x += endDim.width / 2;
+        else if (toEdge === 'left') newEnd.x -= endDim.width / 2;
+        else if (toEdge === 'bottom') newEnd.y += endDim.height / 2;
+        else if (toEdge === 'top') newEnd.y -= endDim.height / 2;
+
+        // Gap for arrowhead
+        const ARROW_GAP = 5;
+        if (toEdge === 'right') newEnd.x += ARROW_GAP;
+        else if (toEdge === 'left') newEnd.x -= ARROW_GAP;
+        else if (toEdge === 'bottom') newEnd.y += ARROW_GAP;
+        else if (toEdge === 'top') newEnd.y -= ARROW_GAP;
+
+        pathPoints[lastIdx] = newEnd;
     }
 
     let pathSegments = [];
@@ -351,10 +406,16 @@ export const getDistributedPoint = (comp, edge, index, total) => {
  * Checks if a label overlaps with components, arrows, or other labels.
  * width and height are the actual label dimensions (from measureLabelText).
  */
-export const labelCollides = (x, y, pathPoints, components, placedLabels, width, height) => {
+// Helper for box intersection
+const boxesOverlap = (a, b) => {
+    return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+};
+
+export const labelCollides = (x, y, pathPoints, components, placedLabels, width, height, groups = []) => {
     const COMPONENT_BUFFER = 20;
     const ARROW_BUFFER = 35;
     const LABEL_BUFFER = 6;
+    const GROUP_BORDER_BUFFER = 15; // increased buffer for borders
 
     const hw = width / 2;
     const hh = height / 2;
@@ -388,21 +449,70 @@ export const labelCollides = (x, y, pathPoints, components, placedLabels, width,
             bottom: comp.y + comp.height / 2 + COMPONENT_BUFFER
         };
 
-        if (!(labelBox.right < compBox.left ||
-            labelBox.left > compBox.right ||
-            labelBox.bottom < compBox.top ||
-            labelBox.top > compBox.bottom)) {
-            return true;
-        }
+        if (boxesOverlap(labelBox, compBox)) return true;
     }
 
     // Check collision with other placed labels
     for (const placed of placedLabels) {
-        if (!(labelBox.right + LABEL_BUFFER < placed.left ||
-            labelBox.left - LABEL_BUFFER > placed.right ||
-            labelBox.bottom + LABEL_BUFFER < placed.top ||
-            labelBox.top - LABEL_BUFFER > placed.bottom)) {
-            return true;
+        const placedWithBuffer = {
+            left: placed.left - LABEL_BUFFER,
+            right: placed.right + LABEL_BUFFER,
+            top: placed.top - LABEL_BUFFER,
+            bottom: placed.bottom + LABEL_BUFFER
+        };
+
+        if (boxesOverlap(labelBox, placedWithBuffer)) return true;
+    }
+
+    // Check collision with Group Borders and Labels
+    if (groups && groups.length > 0) {
+        for (const group of groups) {
+            // 1. Group Label Collision (Top-Left corner)
+            // Estimated text width + icon space.
+            const labelWidthEstimate = (group.name?.length || 10) * 8 + 40;
+            const groupLabelBox = {
+                left: group.x, // padding handled in render
+                right: group.x + labelWidthEstimate,
+                top: group.y,
+                bottom: group.y + 35 // header height
+            };
+            if (boxesOverlap(labelBox, groupLabelBox)) return true;
+
+            // 2. Group Border Collisions
+            // We want to prevent the label from sitting directly ON the border line.
+            // We detect this by checking overlaps with 4 "rectangles" representing the borders.
+
+            // Top Border
+            if (boxesOverlap(labelBox, {
+                left: group.x - GROUP_BORDER_BUFFER,
+                right: group.x + group.width + GROUP_BORDER_BUFFER,
+                top: group.y - GROUP_BORDER_BUFFER,
+                bottom: group.y + GROUP_BORDER_BUFFER
+            })) return true;
+
+            // Bottom Border
+            if (boxesOverlap(labelBox, {
+                left: group.x - GROUP_BORDER_BUFFER,
+                right: group.x + group.width + GROUP_BORDER_BUFFER,
+                top: group.y + group.height - GROUP_BORDER_BUFFER,
+                bottom: group.y + group.height + GROUP_BORDER_BUFFER
+            })) return true;
+
+            // Left Border
+            if (boxesOverlap(labelBox, {
+                left: group.x - GROUP_BORDER_BUFFER,
+                right: group.x + GROUP_BORDER_BUFFER,
+                top: group.y - GROUP_BORDER_BUFFER,
+                bottom: group.y + group.height + GROUP_BORDER_BUFFER
+            })) return true;
+
+            // Right Border
+            if (boxesOverlap(labelBox, {
+                left: group.x + group.width - GROUP_BORDER_BUFFER,
+                right: group.x + group.width + GROUP_BORDER_BUFFER,
+                top: group.y - GROUP_BORDER_BUFFER,
+                bottom: group.y + group.height + GROUP_BORDER_BUFFER
+            })) return true;
         }
     }
 
@@ -445,13 +555,13 @@ export const findBestLabelPosition = (pathPoints) => {
  * @param {number} labelWidth - actual label width from measureLabelText
  * @param {number} labelHeight - actual label height from measureLabelText
  */
-export const findClearLabelPosition = (pathPoints, segmentIndex, components, placedLabels, labelWidth = 90, labelHeight = 26) => {
+export const findClearLabelPosition = (pathPoints, segmentIndex, components, placedLabels, labelWidth = 90, labelHeight = 26, groups = []) => {
     const hw = labelWidth / 2;
     const hh = labelHeight / 2;
 
     // Helper: check a position and return it if clear
     const tryPos = (x, y) =>
-        !labelCollides(x, y, pathPoints, components, placedLabels, labelWidth, labelHeight)
+        !labelCollides(x, y, pathPoints, components, placedLabels, labelWidth, labelHeight, groups)
             ? { x, y }
             : null;
 
@@ -736,3 +846,191 @@ function clipOneSeg(seg, rect) {
 
     return results;
 }
+
+export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTablet }) => {
+    const COMP_WIDTH = 100;
+    const COMP_HEIGHT = 100;   // taller to fit icon + label below
+    const GAP = 40;
+    const GROUP_PADDING = 60;  // space for group label + border
+    const TITLE_SPACE = 60;
+
+    // 1. Build group tree
+    // Initialize map with all groups
+    const groupMap = new Map();
+    if (architecture.groups) {
+        architecture.groups.forEach(g => {
+            groupMap.set(g.id, { ...g, children: [], bounds: null });
+        });
+    }
+
+    const rootGroups = [];
+    const orphanComponentIds = new Set(architecture.components.map(c => c.id));
+
+    // Build tree structure
+    groupMap.forEach(group => {
+        if (group.parentGroupId && groupMap.has(group.parentGroupId)) {
+            groupMap.get(group.parentGroupId).children.push(group);
+        } else {
+            rootGroups.push(group);
+        }
+        // Mark components in this group as not orphans
+        if (group.componentIds) {
+            group.componentIds.forEach(id => orphanComponentIds.delete(id));
+        }
+    });
+
+    // 2. Recursively calculate bounds and positions
+    const positionedComponents = new Map();
+    const positionedGroups = [];
+
+    const layoutGroup = (group, startX, startY) => {
+        let curX = startX + GROUP_PADDING;
+        let curY = startY + GROUP_PADDING + 20; // +20 for label
+        let maxRowHeight = 0;
+        let maxWidth = 0;
+
+        // Layout direct components in this group
+        const directComps = architecture.components.filter(c => c.groupId === group.id || (group.componentIds && group.componentIds.includes(c.id)));
+
+        // Remove from orphan set
+        directComps.forEach(c => orphanComponentIds.delete(c.id));
+
+        // Group components by Tier for vertical stacking
+        const tiers = {
+            top: [],    // user, frontend, external
+            middle: [], // api, service, queue, compute
+            bottom: []  // database, cache, storage
+        };
+
+        directComps.forEach(comp => {
+            const type = comp.type?.toLowerCase() || 'service';
+            if (['user', 'frontend', 'external', 'client'].includes(type) || comp.name.toLowerCase().includes('client') || comp.name.toLowerCase().includes('frontend')) {
+                tiers.top.push(comp);
+            } else if (['database', 'cache', 'storage', 'db'].includes(type) || comp.name.toLowerCase().includes('db') || comp.name.toLowerCase().includes('database') || comp.name.toLowerCase().includes('s3') || comp.name.toLowerCase().includes('bucket')) {
+                tiers.bottom.push(comp);
+            } else {
+                tiers.middle.push(comp);
+            }
+        });
+
+        // Layout Tiers Vertically
+        ['top', 'middle', 'bottom'].forEach(tierName => {
+            const tierComps = tiers[tierName];
+            if (tierComps.length === 0) return;
+
+            // Sort tier components by connection topology (simple heuristic)
+            // This keeps connected components closer horizontally
+            tierComps.sort((a, b) => {
+                // heuristic: if A is connected to something already placed to the left?
+                // Simpler: just keep original order or alphabetical for stability
+                return a.name.localeCompare(b.name);
+            });
+
+            // Layout this tier row
+            let tierX = startX + GROUP_PADDING;
+            let tierMaxHeight = 0;
+
+            tierComps.forEach(comp => {
+                const normalizedService = comp.cloudService ? normalizeServiceName(comp.cloudService) : '';
+                const cloudIconUrl = comp.cloudProvider ? getCloudIcon(comp.cloudProvider, normalizedService) : null;
+
+                positionedComponents.set(comp.id, {
+                    ...comp,
+                    x: tierX + COMP_WIDTH / 2,
+                    y: curY + COMP_HEIGHT / 2,
+                    width: COMP_WIDTH,
+                    height: COMP_HEIGHT,
+                    cloudIconUrl,
+                    normalizedService,
+                    cloudProvider: comp.cloudProvider || architecture.cloudProvider
+                });
+                tierX += COMP_WIDTH + GAP;
+                tierMaxHeight = Math.max(tierMaxHeight, COMP_HEIGHT);
+            });
+
+            // Update group dimensions
+            maxWidth = Math.max(maxWidth, tierX - startX); // relative width
+
+            // Move Y down for next tier
+            curY += tierMaxHeight + GAP;
+            maxRowHeight += tierMaxHeight + GAP; // Accumulate total height used
+        });
+
+        // If no components, ensure at least some height? 
+        if (directComps.length === 0) {
+            // curY is untouched
+        }
+
+        // Layout child groups
+        if (group.children && group.children.length > 0) {
+            // If we have components, add some gap before child groups
+            // if (directComps.length > 0) curY += GAP; 
+            // (Already added GAP after last tier)
+
+            // Layout child groups in a row (or maybe grid later)
+            let childGroupsX = startX + GROUP_PADDING;
+            let maxChildHeight = 0;
+
+            group.children.forEach(childGroup => {
+                const childBounds = layoutGroup(childGroup, childGroupsX, curY);
+                childGroupsX += childBounds.width + GAP;
+                maxWidth = Math.max(maxWidth, childGroupsX - startX);
+                maxChildHeight = Math.max(maxChildHeight, childBounds.height);
+            });
+
+            curY += maxChildHeight + GAP;
+        }
+
+        const myWidth = Math.max(maxWidth, 200) + GROUP_PADDING;
+
+        // Final bounds calculation
+        const bounds = {
+            x: startX,
+            y: startY,
+            width: myWidth,
+            height: (curY - startY) + GROUP_PADDING / 2
+        };
+
+        positionedGroups.push({ ...group, ...bounds });
+        return bounds;
+    };
+
+    let x = 20;
+    let totalHeight = TITLE_SPACE;
+
+    // Layout orphaned components first (if any)
+    const orphans = Array.from(orphanComponentIds).map(id => architecture.components.find(c => c.id === id)).filter(Boolean);
+    if (orphans.length > 0) {
+        // Wrap them in a "Default" group? Or just place them?
+        // Let's place them in a row at top?
+        // Or create a dummy group.
+        const dummyGroup = {
+            id: 'orphans',
+            name: 'Ungrouped Resources',
+            groupType: 'region', // styling fallback
+            children: [],
+            componentIds: orphans.map(c => c.id)
+        };
+        // Add to root groups
+        rootGroups.unshift(dummyGroup);
+    }
+
+    rootGroups.forEach(group => {
+        const bounds = layoutGroup(group, x, TITLE_SPACE);
+        x += bounds.width + GAP;
+        totalHeight = Math.max(totalHeight, bounds.height + TITLE_SPACE + 40);
+    });
+
+    const EXTRA_PADDING = 200; // Extra space for connectors/labels that might detour outside groups
+
+    return {
+        systemName,
+        width: Math.max(x + 20 + EXTRA_PADDING, 1200),
+        height: totalHeight + EXTRA_PADDING,
+        components: Array.from(positionedComponents.values()),
+        connections: architecture.connections,
+        groups: positionedGroups,
+        cloudProvider: architecture.cloudProvider,
+        isCloudMode: true
+    };
+};
