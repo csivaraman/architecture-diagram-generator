@@ -40,13 +40,15 @@ describe('Connector Routing Rules', () => {
             // 3 connections: index 0, 1, 2. Spacing = 140 / 2 = 70.
             // StartX = 0 + 30 = 30.
             // Points: 30, 100, 170.
+            // PREFERRED_GAP is 40. StartX is 100 - (2 * 40)/2 = 60.
+            // Spacing is 60, 100, 140
             const p1 = getDistributedPoint(comp, 'top', 0, 3);
             const p2 = getDistributedPoint(comp, 'top', 1, 3);
             const p3 = getDistributedPoint(comp, 'top', 2, 3);
 
-            expect(p1.x).toBe(30);
+            expect(p1.x).toBe(60);
             expect(p2.x).toBe(100);
-            expect(p3.x).toBe(170);
+            expect(p3.x).toBe(140);
         });
     });
 

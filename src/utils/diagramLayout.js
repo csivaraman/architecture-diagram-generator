@@ -53,64 +53,160 @@ export const calculateConnectorPath = (
     const endVert = isVert(toEdge);
 
     // Routing Logic from pStart to pEnd
+    // We will build `pathPoints` directly taking into account the directions and component bounding boxes.
+    let pathPoints = [start, pStart];
+
+    const getCompBox = (dim) => {
+        if (!dim || !dim.width || !dim.height) return null;
+        return {
+            left: dim.x - dim.width / 2,
+            right: dim.x + dim.width / 2,
+            top: dim.y - dim.height / 2,
+            bottom: dim.y + dim.height / 2
+        };
+    };
+
+    const startBox = getCompBox(startDim);
+    const endBox = getCompBox(endDim);
+
+    const isInsideBox = (pt, box) => {
+        if (!box) return false;
+        // Check with a tiny margin so touching the edge doesn't count as inside
+        return pt.x > box.left + 1 && pt.x < box.right - 1 && pt.y > box.top + 1 && pt.y < box.bottom - 1;
+    };
+
+    const segmentIntersectsBox = (p1, p2, box) => {
+        if (!box) return false;
+        // Quick AABB check first
+        const minX = Math.min(p1.x, p2.x);
+        const maxX = Math.max(p1.x, p2.x);
+        const minY = Math.min(p1.y, p2.y);
+        const maxY = Math.max(p1.y, p2.y);
+
+        if (maxX < box.left || minX > box.right || maxY < box.top || minY > box.bottom) {
+            return false;
+        }
+
+        // If it's a vertical or horizontal segment the AABB check is exact
+        if (p1.x === p2.x) { // Vertical
+            return p1.x > box.left && p1.x < box.right;
+        }
+        if (p1.y === p2.y) { // Horizontal
+            return p1.y > box.top && p1.y < box.bottom;
+        }
+
+        // For diagonal segments (not expected here, but for completeness)
+        return true;
+    };
+
     if (startVert === endVert) {
         // Same Orientation (Vert-Vert or Horiz-Horiz)
-        // Use Midpoint Logic
         if (startVert) {
-            // Both Vertical: Use Mid Y
-            // Apply variation + detour
             let midY = (pStart.y + pEnd.y) / 2;
-
-            // Heuristic: If target is "behind" source (e.g. Bottom to Top but Top is below Bottom),
-            // just standard midY works.
-            // If direct alignment, apply variation.
             if (fromEdge === 'bottom' && toEdge === 'top') midY += routeVariation;
             else if (fromEdge === 'top' && toEdge === 'bottom') midY -= routeVariation;
 
-            midPoints = [
-                { x: pStart.x, y: midY },
-                { x: pEnd.x, y: midY }
-            ];
+            // Check if traversing along midY to pEnd.x hits the start or end boxes
+            const p1 = { x: pStart.x, y: midY };
+            const p2 = { x: pEnd.x, y: midY };
+
+            // If we're routing "backwards" (e.g., from top, but going down)
+            if (segmentIntersectsBox(pStart, p1, startBox) || segmentIntersectsBox(p1, p2, startBox)) {
+                // Route around the start box (left or right)
+                const routeSideX = pEnd.x > pStart.x ? startBox.right + MARGIN : startBox.left - MARGIN;
+                pathPoints.push({ x: routeSideX, y: pStart.y });
+                pathPoints.push({ x: routeSideX, y: midY });
+                pathPoints.push({ x: pEnd.x, y: midY });
+            } else if (segmentIntersectsBox(p1, p2, endBox) || segmentIntersectsBox(p2, pEnd, endBox)) {
+                // Route around the end box
+                const routeSideX = pStart.x > pEnd.x ? endBox.right + MARGIN : endBox.left - MARGIN;
+                pathPoints.push({ x: pStart.x, y: midY });
+                pathPoints.push({ x: routeSideX, y: midY });
+                pathPoints.push({ x: routeSideX, y: pEnd.y });
+            } else {
+                pathPoints.push(p1, p2);
+            }
         } else {
-            // Both Horizontal: Use Mid X
             let midX = (pStart.x + pEnd.x) / 2;
             if (fromEdge === 'right' && toEdge === 'left') midX += routeVariation;
             else if (fromEdge === 'left' && toEdge === 'right') midX -= routeVariation;
 
-            midPoints = [
-                { x: midX, y: pStart.y },
-                { x: midX, y: pEnd.y }
-            ];
+            const p1 = { x: midX, y: pStart.y };
+            const p2 = { x: midX, y: pEnd.y };
+
+            if (segmentIntersectsBox(pStart, p1, startBox) || segmentIntersectsBox(p1, p2, startBox)) {
+                // Route around start box (top or bottom)
+                const routeSideY = pEnd.y > pStart.y ? startBox.bottom + MARGIN : startBox.top - MARGIN;
+                pathPoints.push({ x: pStart.x, y: routeSideY });
+                pathPoints.push({ x: midX, y: routeSideY });
+                pathPoints.push({ x: midX, y: pEnd.y });
+            } else if (segmentIntersectsBox(p1, p2, endBox) || segmentIntersectsBox(p2, pEnd, endBox)) {
+                // Route around end box
+                const routeSideY = pStart.y > pEnd.y ? endBox.bottom + MARGIN : endBox.top - MARGIN;
+                pathPoints.push({ x: midX, y: pStart.y });
+                pathPoints.push({ x: midX, y: routeSideY });
+                pathPoints.push({ x: pEnd.x, y: routeSideY });
+            } else {
+                pathPoints.push(p1, p2);
+            }
         }
     } else {
         // Different Orientation (Corner)
-        // Try simple 1-corner L-shape first
-        // Intersection of (Start-Ray) and (End-Ray)
-        // Start Vert -> x=Start, varies Y. End Horiz -> y=End, varies X. Intersection: (Start.x, End.y)
-        // Start Horiz -> y=Start, varies X. End Vert -> x=End, varies Y. Intersection: (End.x, Start.y)
+        const corner1 = startVert ? { x: pStart.x, y: pEnd.y } : { x: pEnd.x, y: pStart.y };
 
-        const corner = startVert
-            ? { x: pStart.x, y: pEnd.y } // Vert start, Horiz end
-            : { x: pEnd.x, y: pStart.y }; // Horiz start, Vert end
+        // Single corner routing check
+        let isValidSimpleCorner = !segmentIntersectsBox(pStart, corner1, startBox) &&
+            !segmentIntersectsBox(corner1, pEnd, startBox) &&
+            !segmentIntersectsBox(pStart, corner1, endBox) &&
+            !segmentIntersectsBox(corner1, pEnd, endBox);
 
-        // Check if "Corner" is valid (not backwards)
-        // "Backwards" means we have to go "in" towards the component to hit the corner.
-        // pStart is already MARGIN away.
-        // We need to check if moving from pStart to Corner is consistent with fromEdge direction?
-        // Actually, pStart is already "out". Moving perpendicular to 'out' is always fine (it's parallel to edge).
-        // The issue is if the Corner is "behind" the pStart in the 'out' direction?
-        // No, pStart is defined. We move from pStart.
-        // The issue is if Corner -> pEnd is backwards relative to pEnd's entry.
+        if (isValidSimpleCorner) {
+            pathPoints.push(corner1);
+        } else {
+            // Need a U-shape route (two corners) to avoid intersection
+            if (startVert) {
+                // Moving vertically out of start, then horizontally to end
+                const midY = (pStart.y + (fromEdge === 'top' ? startBox.top - MARGIN : startBox.bottom + MARGIN)) / 2;
+                const midX = pEnd.x > pStart.x ? startBox.right + MARGIN : startBox.left - MARGIN;
 
-        // Let's just use the strict L-shape from pStart to pEnd.
-        // It provides 2 intermediate points effectively (pStart, Corner, pEnd).
-        // Total path: Start -> pStart -> Corner -> pEnd -> End.
-        midPoints = [corner];
+                if (!segmentIntersectsBox(pStart, { x: pStart.x, y: midY }, startBox)) {
+                    // It's safe to just use a mid-route if the standard corner is penetrating the end box
+                    const rY = pStart.y;
+                    const rX = toEdge === 'left' ? endBox.left - MARGIN : endBox.right + MARGIN;
+                    pathPoints.push({ x: pStart.x, y: pStart.y }); // Out from start
+                    pathPoints.push({ x: rX, y: pStart.y }); // Across to end column
+                    pathPoints.push({ x: rX, y: pEnd.y }); // Down to end row
+                } else {
+                    const routeY = fromEdge === 'top' ? startBox.top - MARGIN : startBox.bottom + MARGIN;
+                    const routeX = pEnd.x > pStart.x ? startBox.right + MARGIN : startBox.left - MARGIN;
+                    pathPoints.push({ x: pStart.x, y: routeY });
+                    pathPoints.push({ x: routeX, y: routeY });
+                    pathPoints.push({ x: routeX, y: pEnd.y });
+                }
+            } else {
+                // Moving horizontally out of start, then vertically to end
+                const routeX = fromEdge === 'left' ? startBox.left - MARGIN : startBox.right + MARGIN;
+                const routeY = pEnd.y > pStart.y ? startBox.bottom + MARGIN : startBox.top - MARGIN;
+
+                // Alternate route logic based on box intersection
+                if (!segmentIntersectsBox(pStart, { x: routeX, y: pStart.y }, startBox)) {
+                    const rX = pStart.x;
+                    const rY = toEdge === 'top' ? endBox.top - MARGIN : endBox.bottom + MARGIN;
+                    pathPoints.push({ x: pStart.x, y: pStart.y });
+                    pathPoints.push({ x: pStart.x, y: rY });
+                    pathPoints.push({ x: pEnd.x, y: rY });
+                } else {
+                    pathPoints.push({ x: routeX, y: pStart.y });
+                    pathPoints.push({ x: routeX, y: routeY });
+                    pathPoints.push({ x: pEnd.x, y: routeY });
+                }
+            }
+        }
     }
 
-    let pathPoints = [start, pStart, ...midPoints, pEnd, end];
+    pathPoints.push(pEnd, end);
 
-    // Filter duplicates (if pStart == corner, etc)
+    // Filter duplicates
     pathPoints = pathPoints.filter((p, i) => {
         if (i === 0) return true;
         const prev = pathPoints[i - 1];
@@ -377,10 +473,10 @@ export const getDistributedPoint = (comp, edge, index, total) => {
         const EDGE_PADDING = 30;
         const availableWidth = comp.width - (2 * EDGE_PADDING);
         const PREFERRED_GAP = 40; // tighter clustering
-        
+
         // Check if we can cluster centrally
         const requiredSpan = total > 1 ? (total - 1) * PREFERRED_GAP : 0;
-        
+
         if (requiredSpan <= availableWidth) {
             // Cluster Centrally
             const startX = comp.x - requiredSpan / 2;
@@ -403,11 +499,11 @@ export const getDistributedPoint = (comp, edge, index, total) => {
         const requiredSpan = total > 1 ? (total - 1) * PREFERRED_GAP : 0;
 
         if (requiredSpan <= availableHeight) {
-             // Cluster Centrally
-             const startY = comp.y - requiredSpan / 2;
-             const y = startY + (index * PREFERRED_GAP);
-             const x = edge === 'left' ? comp.x - comp.width / 2 : comp.x + comp.width / 2;
-             return { x, y };
+            // Cluster Centrally
+            const startY = comp.y - requiredSpan / 2;
+            const y = startY + (index * PREFERRED_GAP);
+            const x = edge === 'left' ? comp.x - comp.width / 2 : comp.x + comp.width / 2;
+            return { x, y };
         } else {
             // Spread to fit
             const spacing = total > 1 ? availableHeight / (total - 1) : 0;

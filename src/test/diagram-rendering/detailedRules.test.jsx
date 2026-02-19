@@ -27,12 +27,10 @@ describe('Detailed Rule Validation', () => {
             const comp = { x: 100, y: 100, width: 200, height: 100 };
             // Edge padding 30px; Width 200. Available = 140.
             // 2 points: start at -70 + 30 = -40 => x=60. Spacing = 140. 2nd = 200.
-            // Let's check logic: availableWidth = 200 - 60 = 140.
-            // spacing = 140 / (2-1) = 140.
-            // startX = 100 - 100 + 30 = 30.
-            // p0 = 30. p1 = 170.
+            // PREFERRED_GAP is 40. StartX is 100 - (1 * 40)/2 = 80.
+            // p0 = 80. p1 = 120.
             const p0 = getDistributedPoint(comp, 'top', 0, 2);
-            expect(p0.x).toBe(30);
+            expect(p0.x).toBe(80);
             expect(p0.y).toBe(50); // y - height/2 = 100 - 50 = 50
         });
 
@@ -47,9 +45,9 @@ describe('Detailed Rule Validation', () => {
             const obstacle = { left: 80, right: 120, top: 150, bottom: 250 };
             const { pathPoints: detourPath } = calculateConnectorPath(start, end, 'bottom', 'top', 0, 90, [obstacle]);
 
-            // Detour path: start -> start.y+40 -> ...
-            expect(detourPath[1].y).toBe(start.y + 40); // 40px clearance
-            expect(detourPath[detourPath.length - 2].y).toBe(end.y - 40); // 40px clearance
+            // Detour path starts at start.y + 30 based on new MARGIN
+            expect(detourPath[1].y).toBe(start.y + 30); // 30px clearance
+            expect(detourPath[detourPath.length - 2].y).toBe(end.y - 30); // 30px clearance
         });
 
         it('should use dashed lines when passing through obstacles (Rule A8)', () => {

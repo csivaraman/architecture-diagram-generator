@@ -25,10 +25,12 @@ describe('Component Rendering Rules', () => {
         });
 
         it('should normalize Azure service names', () => {
-            expect(normalizeServiceName('Azure SQL')).toBe('sql database');
-            expect(normalizeServiceName('Microsoft Azure Blob Storage')).toBe('storage accounts');
-            expect(normalizeServiceName('Event Grid')).toBe('event grid topics');
-            expect(normalizeServiceName('Queue Storage')).toBe('queue storage');
+            // Note: `normalizeServiceName('Azure SQL')` strips 'Azure ' and returns 'sql'
+            // The mapping from 'sql' to 'sql database' happens if provider='azure' is passed
+            expect(normalizeServiceName('Azure SQL', 'azure')).toBe('sql database');
+            expect(normalizeServiceName('Microsoft Azure Blob Storage', 'azure')).toBe('storage accounts');
+            expect(normalizeServiceName('Event Grid', 'azure')).toBe('event grid topics');
+            expect(normalizeServiceName('Queue Storage', 'azure')).toBe('queue storage');
         });
 
         it('should return correct icon URL', () => {
@@ -36,9 +38,9 @@ describe('Component Rendering Rules', () => {
             const awsUrl = getCloudIcon('aws', 'lambda');
             expect(awsUrl).toContain('/cloud-icons/aws/');
 
-            // Azure VM should map to local file
+            // Azure VM has been changed to be remote instead of mapped to local file in icon map
             const azureUrl = getCloudIcon('azure', 'virtual machine');
-            expect(azureUrl).toContain('/cloud-icons/azure/');
+            expect(azureUrl).toContain('iconify.design');
 
             // Unknown service should fallback to default iconify
             const unknownUrl = getCloudIcon('aws', 'unknown-service-xyz');

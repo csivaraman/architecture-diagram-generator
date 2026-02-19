@@ -98,8 +98,8 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
             (idx % 3) * 15, // variation
             ((idx % 3) - 1) * 90, // detourOffset
             obstacles,
-            { width: 0, height: 0 }, // startDim: 0 because start is already on edge
-            { width: 0, height: 0 }
+            { width: fromComp.width, height: fromComp.height, x: fromComp.x, y: fromComp.y },
+            { width: toComp.width, height: toComp.height, x: toComp.x, y: toComp.y }
         );
 
         // Calculate path string for hover target (invisible thick line)

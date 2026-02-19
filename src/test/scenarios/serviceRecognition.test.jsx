@@ -42,11 +42,11 @@ describe('Service Recognition & Icon Rendering', () => {
         },
         azure_serverless: {
             provider: 'azure',
-            services: ['functions', 'event grid', 'logic apps', 'cosmos db', 'blob storage', 'queue storage', 'api management', 'application insights']
+            services: ['functions', 'event grid', 'logic apps', 'cosmos db', 'blob storage', 'queue storage', 'api management services', 'application insights']
         },
         azure_ai_platform: {
             provider: 'azure',
-            services: ['machine learning', 'cognitive services', 'bot service', 'blob storage', 'cosmos db', 'functions', 'api management', 'monitor']
+            services: ['machine learning', 'cognitive services', 'bot service', 'blob storage', 'cosmos db', 'functions', 'api management services', 'monitor']
         },
 
         // GCP

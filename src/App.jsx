@@ -146,7 +146,7 @@ const ArchitectureDiagramGenerator = () => {
 
 
 
-    const downloadSVG = () => {
+    const downloadSVG = async () => {
         if (!diagram) return;
         const svgElement = document.getElementById('architecture-svg');
         if (!svgElement) {
@@ -159,7 +159,32 @@ const ArchitectureDiagramGenerator = () => {
         clonedSvg.setAttribute('version', '1.1');
         clonedSvg.setAttribute('baseProfile', 'full');
         clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink'); // Needed for href
         clonedSvg.setAttribute('xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
+
+        // Fetch and embed all images as base64
+        const images = clonedSvg.querySelectorAll('image');
+        for (const img of images) {
+            let href = img.getAttribute('href') || img.getAttribute('xlink:href');
+            if (href && !href.startsWith('data:')) {
+                try {
+                    const response = await fetch(href);
+                    const blob = await response.blob();
+                    const base64data = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+
+                    // Update both to be safe
+                    img.setAttribute('href', base64data);
+                    // img.setAttribute('xlink:href', base64data); // Usually href is enough in SVG 2, but xlink:href is safer for compatibility
+                } catch (err) {
+                    console.error('Failed to inline image:', href, err);
+                    // Leave the original href if it fails
+                }
+            }
+        }
 
         // Serialize to XML
         const serializer = new XMLSerializer();

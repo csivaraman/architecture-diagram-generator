@@ -333,7 +333,9 @@ const LegacyDiagramRenderer = ({ diagram, zoom, activeConnection, setActiveConne
 
                         const { pathPoints, pathSegments } = calculateConnectorPath(
                             start, end, fromEdge, toEdge,
-                            routeVariation, detourOffset, obstacles
+                            routeVariation, detourOffset, obstacles,
+                            { width: fromComp.width, height: fromComp.height, x: fromComp.x, y: fromComp.y },
+                            { width: toComp.width, height: toComp.height, x: toComp.x, y: toComp.y }
                         );
 
                         const bestSegment = findBestLabelPosition(pathPoints);
