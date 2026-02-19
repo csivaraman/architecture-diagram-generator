@@ -294,18 +294,20 @@ const LegacyDiagramRenderer = ({ diagram, zoom, activeConnection, setActiveConne
                         const toComp = diagram.components.find(c => c.id === conn.to);
                         if (!fromComp || !toComp) return;
 
-                        const dx = toComp.x - fromComp.x;
-                        const dy = toComp.y - fromComp.y;
+                        // Find the actual edge assigned in connectionPoints
+                        const findAssignedEdge = (compId, connIdx) => {
+                            const points = connectionPoints.get(compId);
+                            if (!points) return 'bottom';
+                            for (const edge of ['top', 'bottom', 'left', 'right']) {
+                                if (points[edge].some(p => p.connIdx === connIdx)) {
+                                    return edge;
+                                }
+                            }
+                            return 'bottom';
+                        };
 
-                        let fromEdge, toEdge;
-
-                        if (Math.abs(dy) > Math.abs(dx)) {
-                            fromEdge = dy > 0 ? 'bottom' : 'top';
-                            toEdge = dy > 0 ? 'top' : 'bottom';
-                        } else {
-                            fromEdge = dx > 0 ? 'right' : 'left';
-                            toEdge = dx > 0 ? 'left' : 'right';
-                        }
+                        const fromEdge = findAssignedEdge(fromComp.id, idx);
+                        const toEdge = findAssignedEdge(toComp.id, idx);
 
                         const fromConnections = connectionPoints.get(fromComp.id)[fromEdge];
                         const toConnections = connectionPoints.get(toComp.id)[toEdge];

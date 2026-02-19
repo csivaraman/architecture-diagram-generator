@@ -1488,6 +1488,8 @@ export const localIconMap = {
         "threatintelligence": "/cloud-icons/gcp/ThreatIntelligence-512-color.svg",
         "vertexai": "/cloud-icons/gcp/VertexAI-512-color.svg",
         "web3": "/cloud-icons/gcp/Web3-512-color.svg",
-        "webmobile": "/cloud-icons/gcp/WebMobile-512-color.svg"
+        "webmobile": "/cloud-icons/gcp/WebMobile-512-color.svg",
+        "cloud trace": "/cloud-icons/gcp/Observability-512-color.svg",
+        "stackdriver trace": "/cloud-icons/gcp/Observability-512-color.svg"
     }
 };

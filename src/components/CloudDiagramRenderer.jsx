@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { getGroupStyle } from '../utils/cloudGroupStyles';
-import { getCloudIcon, normalizeServiceName } from '../utils/cloudIcons';
+import { getCloudIcon, getCloudBadge, normalizeServiceName } from '../utils/cloudIcons';
 import {
     calculateConnectorPath,
     findClearLabelPosition,
     measureLabelText,
-    getConnectorColor
+    getConnectorColor,
+    redistributeOvercrowdedEdges,
+    getDistributedPoint
 } from '../utils/diagramLayout';
 
 const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }) => {
@@ -28,16 +30,20 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
     const obstacles = getObstacles();
     const placedLabels = []; // Track label positions to avoid collisions
 
-    // Pre-calculate connection data for two-pass rendering
-    const connectionData = diagram.connections.map((conn, idx) => {
+    // 1. Pre-calculate connection point distribution (Two-pass approach)
+    const connectionPoints = new Map();
+    diagram.components.forEach(comp => {
+        connectionPoints.set(comp.id, { top: [], bottom: [], left: [], right: [] });
+    });
+
+    diagram.connections.forEach((conn, idx) => {
         const fromComp = diagram.components.find(c => c.id === conn.from);
         const toComp = diagram.components.find(c => c.id === conn.to);
-        if (!fromComp || !toComp) return null;
+        if (!fromComp || !toComp) return;
 
-        // Determine edges based on relative position
-        let fromEdge = 'right', toEdge = 'left';
         const dx = toComp.x - fromComp.x;
         const dy = toComp.y - fromComp.y;
+        let fromEdge, toEdge;
 
         if (Math.abs(dy) > Math.abs(dx)) {
             if (dy > 0) { fromEdge = 'bottom'; toEdge = 'top'; }
@@ -47,19 +53,56 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
             else { fromEdge = 'left'; toEdge = 'right'; }
         }
 
-        const { pathPoints } = calculateConnectorPath(
-            { x: fromComp.x, y: fromComp.y },
-            { x: toComp.x, y: toComp.y },
+        connectionPoints.get(fromComp.id)[fromEdge].push({ connIdx: idx, direction: 'out', toCompId: toComp.id });
+        connectionPoints.get(toComp.id)[toEdge].push({ connIdx: idx, direction: 'in', fromCompId: fromComp.id });
+    });
+
+    // Redistribute edges to avoid overcrowding
+    redistributeOvercrowdedEdges(diagram.components, connectionPoints);
+
+    // 2. Compute actual paths using distributed points
+    const connectionData = diagram.connections.map((conn, idx) => {
+        const fromComp = diagram.components.find(c => c.id === conn.from);
+        const toComp = diagram.components.find(c => c.id === conn.to);
+        if (!fromComp || !toComp) return null;
+
+        // Find the actual edge assigned in connectionPoints
+        const findAssignedEdge = (compId, connIdx) => {
+            const points = connectionPoints.get(compId);
+            if (!points) return 'bottom';
+            for (const edge of ['top', 'bottom', 'left', 'right']) {
+                if (points[edge].some(p => p.connIdx === connIdx)) {
+                    return edge;
+                }
+            }
+            return 'bottom';
+        };
+
+        const fromEdge = findAssignedEdge(fromComp.id, idx);
+        const toEdge = findAssignedEdge(toComp.id, idx);
+
+        const fromConnections = connectionPoints.get(fromComp.id)[fromEdge];
+        const toConnections = connectionPoints.get(toComp.id)[toEdge];
+
+        const fromIndex = fromConnections.findIndex(c => c.connIdx === idx);
+        const toIndex = toConnections.findIndex(c => c.connIdx === idx);
+
+        const start = getDistributedPoint(fromComp, fromEdge, fromIndex, fromConnections.length);
+        const end = getDistributedPoint(toComp, toEdge, toIndex, toConnections.length);
+
+        const { pathPoints, pathSegments } = calculateConnectorPath(
+            start,
+            end,
             fromEdge,
             toEdge,
-            0, // variation
-            40, // detour
+            (idx % 3) * 15, // variation
+            ((idx % 3) - 1) * 90, // detourOffset
             obstacles,
-            { width: 64, height: 64 }, // Cloud component icon size (approx)
-            { width: 64, height: 64 }
+            { width: 0, height: 0 }, // startDim: 0 because start is already on edge
+            { width: 0, height: 0 }
         );
 
-        // Calculate path string
+        // Calculate path string for hover target (invisible thick line)
         const pathD = pathPoints.reduce((acc, p, i) => {
             return acc + (i === 0 ? `M ${p.x} ${p.y}` : ` L ${p.x} ${p.y}`);
         }, '');
@@ -70,11 +113,52 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
 
         if (conn.label) {
             labelDim = measureLabelText(conn.label);
+
+            // PRIORITY: Find best segment based on VISIBLE (non-dashed) length
             let bestSegIdx = 0;
-            let maxLen = 0;
-            for (let i = 0; i < pathPoints.length - 1; i++) {
-                const dist = Math.sqrt((pathPoints[i + 1].x - pathPoints[i].x) ** 2 + (pathPoints[i + 1].y - pathPoints[i].y) ** 2);
-                if (dist > maxLen) { maxLen = dist; bestSegIdx = i; }
+            const segmentVisibility = new Array(Math.max(0, pathPoints.length - 1)).fill(0);
+
+            // Helper to check if point is on segment
+            const isOnSegment = (pt, s1, s2) => {
+                const crossProduct = (pt.y - s1.y) * (s2.x - s1.x) - (pt.x - s1.x) * (s2.y - s1.y);
+                if (Math.abs(crossProduct) > 1) return false; // Not collinear
+                const dotProduct = (pt.x - s1.x) * (s2.x - s1.x) + (pt.y - s1.y) * (s2.y - s1.y);
+                if (dotProduct < 0) return false;
+                const squaredLength = (s2.x - s1.x) ** 2 + (s2.y - s1.y) ** 2;
+                return dotProduct <= squaredLength;
+            };
+
+            if (pathSegments) {
+                pathSegments.forEach(seg => {
+                    if (seg.dashed) return;
+                    const len = Math.sqrt((seg.x2 - seg.x1) ** 2 + (seg.y2 - seg.y1) ** 2);
+                    const mid = { x: (seg.x1 + seg.x2) / 2, y: (seg.y1 + seg.y2) / 2 };
+
+                    // Find which logical segment this visual segment belongs to
+                    for (let i = 0; i < pathPoints.length - 1; i++) {
+                        if (isOnSegment(mid, pathPoints[i], pathPoints[i + 1])) {
+                            segmentVisibility[i] += len;
+                            break;
+                        }
+                    }
+                });
+            }
+
+            let maxVis = -1;
+            for (let i = 0; i < segmentVisibility.length; i++) {
+                if (segmentVisibility[i] > maxVis) {
+                    maxVis = segmentVisibility[i];
+                    bestSegIdx = i;
+                }
+            }
+
+            // Fallback: if no visible segments found, use longest logical segment
+            if (maxVis <= 0) {
+                let maxLen = 0;
+                for (let i = 0; i < pathPoints.length - 1; i++) {
+                    const dist = Math.sqrt((pathPoints[i + 1].x - pathPoints[i].x) ** 2 + (pathPoints[i + 1].y - pathPoints[i].y) ** 2);
+                    if (dist > maxLen) { maxLen = dist; bestSegIdx = i; }
+                }
             }
 
             labelPos = findClearLabelPosition(
@@ -100,16 +184,21 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
             conn,
             fromComp,
             toComp,
-            pathD,
+            pathD,     // For hover target only
+            pathSegments, // For visual rendering
             labelPos,
             labelDim,
             color: getConnectorColor(idx)
         };
     }).filter(Boolean);
 
+
     return (
         <svg
             id="architecture-svg"
+            xmlns="http://www.w3.org/2000/svg"
+            version="1.1"
+            baseProfile="full"
             width={diagram.width}
             height={diagram.height}
             style={{ cursor: activeConnection !== null ? 'pointer' : 'default' }}
@@ -123,12 +212,12 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
                             key={`arrow-cloud-${i}`}
                             id={`arrowhead-cloud-${i}`}
                             markerWidth="10"
-                            markerHeight="7"
+                            markerHeight="10"
                             refX="9"
-                            refY="3.5"
+                            refY="5"
                             orient="auto"
                         >
-                            <polygon points="0 0, 10 3.5, 0 7" fill={colors[i]} />
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill={colors[i]} />
                         </marker>
                     );
                 })}
@@ -153,6 +242,18 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
                 ))}
             </defs>
 
+            <text
+                x={diagram.width / 2}
+                y={50}
+                fontSize="24"
+                fontWeight="bold"
+                fill="#1f2937"
+                textAnchor="middle"
+                style={{ textTransform: 'uppercase', letterSpacing: '1px' }}
+            >
+                {diagram.systemName}
+            </text>
+
             {/* 1. Render group boundaries */}
             {[...diagram.groups]
                 .sort((a, b) => b.width - a.width)
@@ -176,7 +277,7 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
                             )}
                             <text x={group.x + (style.iconUrl ? 32 : 12)} y={group.y + 20}
                                 fontSize="13" fontWeight="600" fill={style.labelColor}
-                                style={{ fontFamily: 'sans-serif' }}>
+                                style={{ fontFamily: 'sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}>
                                 {group.name}
                             </text>
                         </g>
@@ -200,21 +301,36 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
                         {/* Invisible thick path for easier hovering */}
                         <path d={pathD} stroke="transparent" strokeWidth="40" fill="none" />
 
-                        {/* Visible path */}
-                        <path
-                            d={pathD}
-                            stroke={color}
-                            strokeWidth={strokeWidth}
-                            fill="none"
-                            markerEnd={`url(#arrowhead-cloud-${idx % 8})`}
-                            strokeLinejoin="round"
-                            strokeDasharray={conn.type === 'async' ? '6,4' : 'none'}
-                            style={{
-                                opacity,
-                                transition: 'all 0.2s',
-                                filter: isActive ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
-                            }}
-                        />
+                        {/* Visible path segments */}
+                        {cd.pathSegments && cd.pathSegments.map((seg, segIdx) => (
+                            <g key={`seg-${segIdx}`}>
+                                {/* Glow Halo */}
+                                <line
+                                    x1={seg.x1} y1={seg.y1}
+                                    x2={seg.x2} y2={seg.y2}
+                                    stroke={color}
+                                    strokeWidth={isActive ? 20 : 14}
+                                    strokeOpacity={isActive ? 0.2 : 0.05}
+                                    strokeLinecap="round"
+                                    style={{ transition: 'all 0.3s ease' }}
+                                />
+                                {/* Main Line */}
+                                <line
+                                    x1={seg.x1} y1={seg.y1}
+                                    x2={seg.x2} y2={seg.y2}
+                                    stroke={color}
+                                    strokeWidth={strokeWidth}
+                                    strokeDasharray={seg.dashed ? '6,3' : (conn.type === 'async' ? '6,4' : 'none')}
+                                    strokeLinecap="round"
+                                    markerEnd={segIdx === cd.pathSegments.length - 1 ? `url(#arrowhead-cloud-${idx % 8})` : 'none'}
+                                    style={{
+                                        opacity,
+                                        transition: 'all 0.2s',
+                                        filter: isActive ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
+                                    }}
+                                />
+                            </g>
+                        ))}
                     </g>
                 );
             })}
@@ -226,12 +342,14 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
                 // Highlight if part of active connection
                 const isConnected = activeConnection !== null && connectionData.find(cd => cd.idx === activeConnection && (cd.fromComp.id === comp.id || cd.toComp.id === comp.id));
                 const opacity = (activeConnection !== null && !isConnected) ? 0.4 : 1;
-                const transform = isConnected ? `scale(1.05) translate(${comp.x - comp.width / 2}, ${comp.y - comp.height / 2})` : `translate(${comp.x - comp.width / 2}, ${comp.y - comp.height / 2})`;
+                const transform = isConnected
+                    ? `translate(${comp.x - comp.width / 2}, ${comp.y - comp.height / 2}) scale(1.05)`
+                    : `translate(${comp.x - comp.width / 2}, ${comp.y - comp.height / 2})`;
 
                 return (
                     <g
                         key={comp.id}
-                        transform={`translate(${comp.x - comp.width / 2}, ${comp.y - comp.height / 2})`}
+                        transform={transform}
                         style={{
                             opacity,
                             transition: 'all 0.3s ease',
@@ -239,40 +357,134 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
                         }}
                     >
                         {/* Hover/Active Effect Background */}
-                        {isConnected && (
-                            <rect
-                                x={-4} y={-4}
-                                width={comp.width + 8} height={comp.height + 8}
-                                fill="rgba(59, 130, 246, 0.1)"
-                                rx="12"
+                        {/* Component Background (Permanent) */}
+                        <rect
+                            x={-4} y={-4}
+                            width={comp.width + 8} height={comp.height + 8}
+                            fill="rgba(59, 130, 246, 0.1)"
+                            rx="12"
+                        />
+
+                        {/* Fallback Badge (hidden by default, shown on error) */}
+                        <g
+                            id={`fallback-badge-${comp.id}`}
+                            style={{ display: 'none' }}
+                        >
+                            <circle
+                                cx={comp.width / 2}
+                                cy={44}
+                                r={30}
+                                fill={getCloudBadge(comp.cloudProvider || diagram.cloudProvider)?.color || '#9ca3af'}
+                                stroke="#ffffff"
+                                strokeWidth="2"
                             />
-                        )}
+                            <text
+                                x={comp.width / 2}
+                                y={44}
+                                fill="#ffffff"
+                                fontSize="14"
+                                fontWeight="bold"
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                            >
+                                {getCloudBadge(comp.cloudProvider || diagram.cloudProvider)?.text || '?'}
+                            </text>
+                        </g>
 
                         <image
                             href={iconUrl}
-                            x={(comp.width - 64) / 2}
+                            x={(comp.width - 80) / 2}
                             y={4}
-                            width={64}
-                            height={64}
+                            width={80}
+                            height={80}
                             filter="url(#shadow-cloud)"
-                            onError={(e) => { e.target.style.display = 'none'; }}
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                const fallback = document.getElementById(`fallback-badge-${comp.id}`);
+                                if (fallback) fallback.style.display = 'block';
+                            }}
                             style={{ transition: 'transform 0.2s' }}
                         />
-                        <foreignObject x={0} y={70} width={comp.width} height={40}>
-                            <div style={{
-                                textAlign: 'center',
-                                fontSize: '11px',
-                                fontWeight: '500',
-                                color: '#1f2937',
-                                lineHeight: '1.2',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                textShadow: '0 1px 2px rgba(255,255,255,0.8)'
-                            }}>
-                                {comp.name}
+                        <foreignObject x={0} y={90} width={comp.width} height={comp.height - 90}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'flex-start',
+                                    height: '100%',
+                                    padding: '0 4px'
+                                }}
+                            >
+                                <div
+                                    title={comp.name}
+                                    style={{
+                                        textAlign: 'center',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        color: '#1f2937',
+                                        lineHeight: '1.2',
+                                        marginBottom: '4px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        textShadow: '0 1px 2px rgba(255,255,255,0.8)',
+                                    }}>
+                                    {comp.name}
+                                </div>
+
+                                {/* Cloud Service Pill */}
+                                {comp.cloudService && comp.cloudService.toLowerCase() !== (comp.name || '').toLowerCase() && (
+                                    <div style={{
+                                        fontSize: '9px',
+                                        color: '#4b5563',
+                                        background: '#e5e7eb',
+                                        padding: '1px 6px',
+                                        borderRadius: '10px',
+                                        marginTop: '2px',
+                                        maxWidth: '90%',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        border: '1px solid #d1d5db'
+                                    }}>
+                                        {comp.cloudService}
+                                    </div>
+                                )}
+
+                                {/* Technology Tags */}
+                                {comp.technologies && comp.technologies.length > 0 && (
+                                    <div style={{
+                                        display: 'flex',
+                                        gap: '3px',
+                                        flexWrap: 'wrap',
+                                        justifyContent: 'center',
+                                        marginTop: '4px',
+                                        maxWidth: '100%'
+                                    }}>
+                                        {comp.technologies
+                                            .filter(tech => {
+                                                const t = tech.toLowerCase();
+                                                const n = (comp.name || '').toLowerCase();
+                                                const s = (comp.cloudService || '').toLowerCase();
+                                                return t !== n && t !== s;
+                                            })
+                                            .slice(0, 2).map((tech, i) => (
+                                                <span key={i} style={{
+                                                    fontSize: '8px',
+                                                    color: '#374151',
+                                                    background: '#f3f4f6',
+                                                    padding: '1px 4px',
+                                                    borderRadius: '3px',
+                                                    border: '1px solid #e5e7eb'
+                                                }}>
+                                                    {tech}
+                                                </span>
+                                            ))}
+                                    </div>
+                                )}
                             </div>
                         </foreignObject>
                     </g>
@@ -315,11 +527,14 @@ const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }
                             x={0}
                             y={0}
                             fill={color}
-                            fontSize={isActive ? "12" : "11"}
+                            fontSize={isActive ? "11.5" : "10"}
                             textAnchor="middle"
                             dominantBaseline="central"
                             fontWeight="600"
-                            style={{ transition: 'all 0.2s' }}
+                            style={{
+                                transition: 'all 0.2s',
+                                letterSpacing: isActive ? '0.3px' : '0px'
+                            }}
                         >
                             {conn.label}
                         </text>

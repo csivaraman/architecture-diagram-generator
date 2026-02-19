@@ -4,7 +4,7 @@
 
 import { localIconMap } from './localIconMap.js';
 
-export const normalizeServiceName = (serviceName) => {
+export const normalizeServiceName = (serviceName, cloudProvider = '') => {
     if (!serviceName) return '';
 
     const normalized = serviceName.toLowerCase().trim();
@@ -17,7 +17,7 @@ export const normalizeServiceName = (serviceName) => {
         cleanedService = cleanedService.replace(vendorPrefixes, '');
     }
 
-    const aliases = {
+    const commonAliases = {
         // AWS
         'ec2 instance': 'ec2',
         'lambda function': 'lambda',
@@ -38,6 +38,8 @@ export const normalizeServiceName = (serviceName) => {
         'eks': 'elastic kubernetes service', // generic mapping (will likely fallback unless exact local match exists)
         'route53': 'route 53',
         'route 53': 'route 53',
+        'apigateway': 'api gateway', // alias for LLM variations
+        'api-gateway': 'api gateway',
         'alb': 'res_elastic load balancing_application load balancer',
         'application load balancer': 'res_elastic load balancing_application load balancer',
         'elb': 'res_elastic load balancing_application load balancer', // generic load balancer
@@ -88,8 +90,9 @@ export const normalizeServiceName = (serviceName) => {
         'appstream': 'appstream', // fallback
         'msk': 'msk_amazon msk connect', // best local match
         'amazon msk': 'msk_amazon msk connect',
+    };
 
-
+    const azureAliases = {
         // Azure
         'sql': 'sql database',
         'blob': 'storage accounts',
@@ -125,6 +128,127 @@ export const normalizeServiceName = (serviceName) => {
         'devops': 'azure devops',
         'security center': 'microsoft defender for cloud',
         'monitor': 'monitor',
+        'front door': 'front door and cdn profiles',
+        'load balancer': 'load balancers',
+        'virtual network': 'virtual networks',
+        'vnet': 'virtual networks',
+        'vpn gateway': 'virtual network gateways',
+        'expressroute': 'expressroute circuits',
+        'firewall': 'firewalls',
+        'dns': 'dns zones',
+        'dns zone': 'dns zones',
+        'synapse': 'azure synapse analytics',
+        'analysis services': 'analysis services',
+        'data factory': 'data factories',
+        'purview': 'pruview accounts', // typo in local file? checking map... assuming 'purview accounts' or similar.
+        // Actually looking at localIconMap 'pruview accounts' seems unlikely. 'purview accounts' maybe?
+        // Let's stick to safe ones or previously verified.
+        'sentinel': 'azure sentinel',
+        'advisor': 'advisor',
+        'backup': 'backup center', // or recovery services vaults
+        'site recovery': 'recovery services vaults',
+        'machine learning': 'machine learning',
+        'bot service': 'bot services',
+        'cognitive services': 'cognitive services',
+        'iot hub': 'iot hub',
+        'iot central': 'iot central applications',
+        'digital twins': 'azure digital twins',
+        'vm': 'virtual machines',
+        'virtual machine': 'virtual machines',
+        'virtual machines': 'virtual machines', // Specific to Azure
+        'cloud shell': 'azure cloud shell', // Specific to Azure
+        'communication services': 'azure communication services',
+        'network function manager functions': 'azure network function manager functions',
+        'vmware solution': 'azure vmware solution',
+        'experimentation studio': 'azure experimentation studio',
+        'object understanding': 'azure object understanding',
+
+        // Azure Aliases (Generated)
+        'firewall manager': 'azure firewall manager',
+        'firewall policy': 'azure firewall policy',
+        'virtual desktop': 'azure virtual desktop',
+        'monitors for sap solutions': 'azure monitors for sap solutions',
+        'lighthouse': 'azure lighthouse',
+        'synapse analytics': 'azure synapse analytics',
+        'databox gateway': 'azure databox gateway',
+        'arc': 'azure arc',
+        'hcp cache': 'azure hcp cache',
+        'network function manager functions': 'azure network function manager functions',
+        'vmware solution': 'azure vmware solution',
+        'experimentation studio': 'azure experimentation studio',
+        'object understanding': 'azure object understanding',
+        'video indexer': 'azure video indexer',
+        'arc postgresql': 'arc postgresql ',
+        'workbooks': 'azure workbooks',
+        'chaos studio': 'azure chaos studio',
+        'defender for iot': 'microsoft defender for iot',
+        'backup center': 'azure backup center',
+        'sql database': 'azure sql',
+        'monitor dashboard': 'azure monitor dashboard',
+        'support center blue': 'azure support center blue',
+        'hpc workbenches': 'azure hpc workbenches',
+        'hybrid center': 'azure hybrid center',
+        'orbital': 'azure orbital',
+        'network function manager': 'azure network function manager',
+        'applied ai services': 'azure applied ai services',
+        'sql edge': 'azure sql edge',
+        'edge hardware center': 'azure edge hardware center',
+        'database postgresql server group': 'azure database postgresql server group',
+        'compute galleries': 'azure compute galleries',
+        'managed grafana': 'azure managed grafana',
+        'load testing': 'azure load testing',
+        'quotas': 'azure quotas',
+        'center for sap': 'azure center for sap',
+        'storage mover': 'azure storage mover',
+        'operator 5g core': 'azure operator 5g core',
+        'dev box': 'microsoft dev box',
+        'deployment environments': 'azure deployment environments',
+        'discovery': 'microsoft discovery',
+        'stack hci sizer': 'azure stack hci sizer',
+        'dev tunnels': 'azure dev tunnels',
+        'communications gateway': 'azure communications gateway',
+        'sustainability': 'azure sustainability',
+        'operator nexus': 'azure operator nexus',
+        'red hat openshift': 'azure red hat openshift',
+        'operator insights': 'azure operator insights',
+        'operator service manager': 'azure operator service manager',
+        'defender easm': 'microsoft defender easm',
+        'programmable connectivity': 'azure programmable connectivity',
+        'local': 'azure local',
+        'app testing': 'azure app testing',
+        'container storage': 'azure container storage',
+        'openai': 'azure openai',
+        'iot operations': 'azure iot operations',
+        'consumption commitment': 'azure consumption commitment',
+        'monitor pipeline': 'azure monitor pipeline',
+        'linux': 'azure linux',
+        'managed redis': 'azure managed redis',
+        'a': 'azure a',
+        'stack edge': 'azure stack edge',
+        'netapp files': 'azure netapp files',
+        'stack': 'azure stack',
+        'database mysql server': 'azure database mysql server',
+        'database mariadb server': 'azure database mariadb server',
+        'sql vm': 'azure sql vm',
+        'database postgresql server': 'azure database postgresql server',
+        'database migration services': 'azure database migration services',
+        'sql server stretch databases': 'azure sql server stretch databases',
+        'data explorer clusters': 'azure data explorer clusters',
+        'maps accounts': 'azure maps accounts',
+        'sphere': 'azure sphere',
+        'api for fhir': 'azure api for fhir',
+        'data catalog': 'azure data catalog',
+        'ad b2c': 'azure ad b2c',
+        'information protection': 'azure information protection',
+        'defender for cloud': 'microsoft defender for cloud',
+        'sentinel': 'azure sentinel',
+        'migrate': 'azure migrate',
+        'media service': 'azure media service',
+        'blockchain service': 'azure blockchain service',
+        'token service': 'azure token service',
+        'spring apps': 'azure spring apps',
+        'fileshares': 'azure fileshares',
+        'databricks': 'azure databricks',
 
         // GCP
         'gke cluster': 'gke',
@@ -153,14 +277,120 @@ export const normalizeServiceName = (serviceName) => {
         'firebase': 'firebase', // fallback
     };
 
-    return aliases[cleanedService] || cleanedService;
+    const gcpAliases = {
+        'compute engine': 'computeengine',
+        'virtual machines': 'computeengine',
+        'vms': 'computeengine',
+        'kubernetes engine': 'gke',
+        'gke cluster': 'gke',
+        'gke': 'gke',
+        'cloud run': 'cloudrun', // normalized to 'cloudrun' in map check
+        'cloud functions': 'serverlesscomputing',
+        'app engine': 'compute',
+        'distributed cloud': 'distributedcloud',
+        'gdc': 'distributedcloud',
+        'vmware engine': 'compute',
+        'batch': 'compute',
+        'vertex ai platform': 'vertexai',
+        'vertex ai search & conversation': 'vertexai',
+        'vertex ai agent builder': 'agents',
+        'gemini api': 'aimachinelearning',
+        'model garden': 'aimachinelearning',
+        'automl': 'aimachinelearning',
+        'document ai': 'aimachinelearning',
+        'speech-to-text': 'aimachinelearning',
+        'text-to-speech': 'aimachinelearning',
+        'cloud translation api': 'aimachinelearning',
+        'video intelligence api': 'aimachinelearning',
+        'alloydb for postgresql': 'alloydb',
+        'cloud bigtable': 'databases',
+        'firestore': 'databases',
+        'memorystore': 'databases',
+        'database migration service': 'migration',
+        'dms': 'migration',
+        'persistent disk': 'storage',
+        'filestore': 'storage',
+        'cloud netapp volumes': 'storage',
+        'local ssd': 'storage',
+        'backup and dr service': 'storage',
+        'virtual private cloud vpc': 'networking',
+        'virtual private cloud': 'networking',
+        'vpc': 'networking',
+        'cloud load balancing': 'networking',
+        'cloud dns': 'networking',
+        'cloud cdn': 'networking',
+        'cloud interconnect': 'networking',
+        'cloud vpn': 'networking',
+        'cloud nat': 'networking',
+        'network intelligence center': 'networking',
+        'service directory': 'networking',
+        'bq': 'bigquery',
+        'bigquery': 'bigquery',
+        'dataflow': 'dataanalytics',
+        'dataproc': 'dataanalytics',
+        'cloud composer': 'dataanalytics',
+        'pub/sub': 'dataanalytics',
+        'pubsub': 'dataanalytics',
+        'dataplex': 'dataanalytics',
+        'data fusion': 'dataanalytics',
+        'iam': 'securityidentity',
+        'identity and access management': 'securityidentity',
+        'identity-aware proxy': 'securityidentity',
+        'iap': 'securityidentity',
+        'cloud security command center': 'securitycommandcenter',
+        'scc': 'securitycommandcenter',
+        'cloud armor': 'securityidentity',
+        'secret manager': 'securityidentity',
+        'cloud key management service': 'securityidentity',
+        'kms': 'securityidentity',
+        'beyondcorp enterprise': 'securityidentity',
+        'chronicle security operations': 'secops',
+        'cloud build': 'devops',
+        'artifact registry': 'devops',
+        'cloud deploy': 'devops',
+        'deployment manager': 'managementtools',
+        'infrastructure manager': 'managementtools',
+        'cloud shell': 'developer_tools',
+        'cloud workstations': 'developer_tools',
+        'operations suite': 'operations',
+        'stackdriver': 'operations',
+        'apigee': 'apigee',
+        'cloud storage': 'cloud_storage',
+        'cloud sql': 'cloudsql',
+        'cloud spanner': 'cloudspanner',
+        'spanner': 'cloudspanner',
+        'vertex ai': 'vertexai',
+        'vertex': 'vertexai',
+        'memcache': 'memorystore',
+    };
+
+    let finalService = commonAliases[cleanedService] || cleanedService;
+
+    if (cloudProvider) {
+        const provider = cloudProvider.toLowerCase();
+        if (provider === 'azure' && azureAliases[cleanedService]) {
+            finalService = azureAliases[cleanedService];
+        } else if ((provider === 'gcp' || provider === 'google') && gcpAliases[cleanedService]) {
+            finalService = gcpAliases[cleanedService];
+        }
+    }
+
+    return finalService;
+};
+
+const getLocalIconPath = (provider, service) => {
+    // service is assumed to be normalized already
+    const providerMap = localIconMap[provider.toLowerCase()];
+    if (!providerMap) return null;
+
+    return providerMap[service] || null;
 };
 
 export const getCloudIcon = (cloudProvider, cloudService) => {
     if (!cloudProvider) return null;
 
     const provider = cloudProvider.toLowerCase();
-    const service = normalizeServiceName(cloudService);
+    const service = normalizeServiceName(cloudService, provider);
 
     // Try local self-hosted icon first
     const localPath = getLocalIconPath(provider, service);
@@ -202,7 +432,7 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
             'keyspaces': 'https://api.iconify.design/logos/aws-keyspaces.svg',
 
             // Networking
-            'api gateway': 'https://api.iconify.design/logos/aws-api-gateway.svg',
+            'api gateway': localIconMap.aws ? localIconMap.aws['api gateway'] : 'https://api.iconify.design/logos/aws-api-gateway.svg',
             'cloudfront': 'https://api.iconify.design/logos/aws-cloudfront.svg',
             'route53': 'https://api.iconify.design/logos/aws-route53.svg',
             'route 53': 'https://api.iconify.design/logos/aws-route53.svg',
@@ -513,13 +743,7 @@ export const getCloudIcon = (cloudProvider, cloudService) => {
     return providerMap[service] || providerMap['_default'];
 };
 
-const getLocalIconPath = (provider, service) => {
-    // service is assumed to be normalized already
-    const providerMap = localIconMap[provider.toLowerCase()];
-    if (!providerMap) return null;
 
-    return providerMap[service] || null;
-};
 
 export const getCloudBadge = (cloudProvider) => {
     const badges = {

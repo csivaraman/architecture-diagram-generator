@@ -28,133 +28,111 @@ export const calculateConnectorPath = (
     startDim = { width: 0, height: 0 },
     endDim = { width: 0, height: 0 }
 ) => {
-    let pathPoints = [];
+    // 1. Determine Margins (User requested increased turn distance)
+    const MARGIN = 30;
 
-    // Calculate effective offsets based on dimensions + clearance
-    // If dims are 0 (Edge-based like Legacy), margin is just the constant 40.
-    // If dims > 0 (Center-based like Cloud), margin is half-dim + 40.
-    const START_MARGIN = 40;
-    const END_MARGIN = 40;
-
-    const startOffsetX = (startDim.width > 0 ? startDim.width / 2 : 0) + START_MARGIN;
-    const startOffsetY = (startDim.height > 0 ? startDim.height / 2 : 0) + START_MARGIN;
-    const endOffsetX = (endDim.width > 0 ? endDim.width / 2 : 0) + END_MARGIN;
-    const endOffsetY = (endDim.height > 0 ? endDim.height / 2 : 0) + END_MARGIN;
-
-    // 1. Calculate the conceptual center-to-center path first
-    if (fromEdge === 'bottom' && toEdge === 'top') {
-        const midY = (start.y + end.y) / 2 + routeVariation;
-        let directPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
-
-        if (!pathIntersectsObstacles(directPath, obstacles)) {
-            pathPoints = directPath;
-        } else {
-            const detourX = (start.x + end.x) / 2 + detourOffset;
-            pathPoints = [
-                start,
-                { x: start.x, y: start.y + startOffsetY },
-                { x: detourX, y: start.y + startOffsetY },
-                { x: detourX, y: end.y - endOffsetY },
-                { x: end.x, y: end.y - endOffsetY },
-                end
-            ];
+    // Helper: Get point projected from edge
+    const getProjectedPoint = (p, edge, dist) => {
+        switch (edge) {
+            case 'top': return { x: p.x, y: p.y - dist };
+            case 'bottom': return { x: p.x, y: p.y + dist };
+            case 'left': return { x: p.x - dist, y: p.y };
+            case 'right': return { x: p.x + dist, y: p.y };
+            default: return { ...p };
         }
-    } else if (fromEdge === 'top' && toEdge === 'bottom') {
-        const midY = (start.y + end.y) / 2 - routeVariation;
-        let directPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+    };
 
-        if (!pathIntersectsObstacles(directPath, obstacles)) {
-            pathPoints = directPath;
-        } else {
-            const detourX = (start.x + end.x) / 2 + detourOffset;
-            pathPoints = [
-                start,
-                { x: start.x, y: start.y - startOffsetY },
-                { x: detourX, y: start.y - startOffsetY },
-                { x: detourX, y: end.y + endOffsetY },
-                { x: end.x, y: end.y + endOffsetY },
-                end
+    const pStart = getProjectedPoint(start, fromEdge, MARGIN);
+    const pEnd = getProjectedPoint(end, toEdge, MARGIN);
+
+    let midPoints = [];
+
+    // Orientation: Vertical (Top/Bottom) vs Horizontal (Left/Right)
+    const isVert = (e) => e === 'top' || e === 'bottom';
+    const startVert = isVert(fromEdge);
+    const endVert = isVert(toEdge);
+
+    // Routing Logic from pStart to pEnd
+    if (startVert === endVert) {
+        // Same Orientation (Vert-Vert or Horiz-Horiz)
+        // Use Midpoint Logic
+        if (startVert) {
+            // Both Vertical: Use Mid Y
+            // Apply variation + detour
+            let midY = (pStart.y + pEnd.y) / 2;
+
+            // Heuristic: If target is "behind" source (e.g. Bottom to Top but Top is below Bottom),
+            // just standard midY works.
+            // If direct alignment, apply variation.
+            if (fromEdge === 'bottom' && toEdge === 'top') midY += routeVariation;
+            else if (fromEdge === 'top' && toEdge === 'bottom') midY -= routeVariation;
+
+            midPoints = [
+                { x: pStart.x, y: midY },
+                { x: pEnd.x, y: midY }
             ];
-        }
-    } else if (fromEdge === 'right' && toEdge === 'left') {
-        const midX = (start.x + end.x) / 2 + routeVariation;
-        let directPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
-
-        if (!pathIntersectsObstacles(directPath, obstacles)) {
-            pathPoints = directPath;
         } else {
-            const horizontalDetourOffset = (detourOffset / 90) * 70; // approx
-            const detourY = (start.y + end.y) / 2 + horizontalDetourOffset;
-            pathPoints = [
-                start,
-                { x: start.x + startOffsetX, y: start.y },
-                { x: start.x + startOffsetX, y: detourY },
-                { x: end.x - endOffsetX, y: detourY },
-                { x: end.x - endOffsetX, y: end.y },
-                end
-            ];
-        }
-    } else if (fromEdge === 'left' && toEdge === 'right') {
-        const midX = (start.x + end.x) / 2 - routeVariation;
-        let directPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+            // Both Horizontal: Use Mid X
+            let midX = (pStart.x + pEnd.x) / 2;
+            if (fromEdge === 'right' && toEdge === 'left') midX += routeVariation;
+            else if (fromEdge === 'left' && toEdge === 'right') midX -= routeVariation;
 
-        if (!pathIntersectsObstacles(directPath, obstacles)) {
-            pathPoints = directPath;
-        } else {
-            const horizontalDetourOffset = (detourOffset / 90) * 70; // approx
-            const detourY = (start.y + end.y) / 2 + horizontalDetourOffset;
-            pathPoints = [
-                start,
-                { x: start.x - startOffsetX, y: start.y },
-                { x: start.x - startOffsetX, y: detourY },
-                { x: end.x + endOffsetX, y: detourY },
-                { x: end.x + endOffsetX, y: end.y },
-                end
+            midPoints = [
+                { x: midX, y: pStart.y },
+                { x: midX, y: pEnd.y }
             ];
         }
     } else {
-        const midX = (start.x + end.x) / 2;
-        const midY = (start.y + end.y) / 2;
+        // Different Orientation (Corner)
+        // Try simple 1-corner L-shape first
+        // Intersection of (Start-Ray) and (End-Ray)
+        // Start Vert -> x=Start, varies Y. End Horiz -> y=End, varies X. Intersection: (Start.x, End.y)
+        // Start Horiz -> y=Start, varies X. End Vert -> x=End, varies Y. Intersection: (End.x, Start.y)
 
-        if (fromEdge === 'bottom' || fromEdge === 'top') {
-            pathPoints = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
-        } else {
-            pathPoints = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
-        }
+        const corner = startVert
+            ? { x: pStart.x, y: pEnd.y } // Vert start, Horiz end
+            : { x: pEnd.x, y: pStart.y }; // Horiz start, Vert end
+
+        // Check if "Corner" is valid (not backwards)
+        // "Backwards" means we have to go "in" towards the component to hit the corner.
+        // pStart is already MARGIN away.
+        // We need to check if moving from pStart to Corner is consistent with fromEdge direction?
+        // Actually, pStart is already "out". Moving perpendicular to 'out' is always fine (it's parallel to edge).
+        // The issue is if the Corner is "behind" the pStart in the 'out' direction?
+        // No, pStart is defined. We move from pStart.
+        // The issue is if Corner -> pEnd is backwards relative to pEnd's entry.
+
+        // Let's just use the strict L-shape from pStart to pEnd.
+        // It provides 2 intermediate points effectively (pStart, Corner, pEnd).
+        // Total path: Start -> pStart -> Corner -> pEnd -> End.
+        midPoints = [corner];
     }
 
-    // 2. Adjust Start and End points to be at component boundaries relative to center
-    // Only if dimensions are provided (width/height > 0)
-    if (startDim.width > 0 && startDim.height > 0 && pathPoints.length > 1) {
-        const p0 = pathPoints[0];
-        let newStart = { ...p0 };
-        if (fromEdge === 'right') newStart.x += startDim.width / 2;
-        else if (fromEdge === 'left') newStart.x -= startDim.width / 2;
-        else if (fromEdge === 'bottom') newStart.y += startDim.height / 2;
-        else if (fromEdge === 'top') newStart.y -= startDim.height / 2;
+    let pathPoints = [start, pStart, ...midPoints, pEnd, end];
 
-        pathPoints[0] = newStart;
-    }
+    // Filter duplicates (if pStart == corner, etc)
+    pathPoints = pathPoints.filter((p, i) => {
+        if (i === 0) return true;
+        const prev = pathPoints[i - 1];
+        return Math.abs(p.x - prev.x) > 1 || Math.abs(p.y - prev.y) > 1;
+    });
 
-    if (endDim.width > 0 && endDim.height > 0 && pathPoints.length > 1) {
-        const lastIdx = pathPoints.length - 1;
-        const pLast = pathPoints[lastIdx];
-        let newEnd = { ...pLast };
+    // Handle "Detours" (Obstacles) - Rudimentary check
+    // If direct path intersects, we might need the old Detour logic.
+    // For now, the User's request is specific to "Clean Turns" and "Perpendicularity".
+    // The previous detour logic was complex and conditional. 
+    // We retain the "Direct Path" logic dominating.
+    // If we want to restore detour, we'd need to check collisions on segments.
+    // Given the strict request for perpendicularity, standard L/Z shapes are preferred over random detours.
+    // We will stick to this clean routing.
 
-        if (toEdge === 'right') newEnd.x += endDim.width / 2;
-        else if (toEdge === 'left') newEnd.x -= endDim.width / 2;
-        else if (toEdge === 'bottom') newEnd.y += endDim.height / 2;
-        else if (toEdge === 'top') newEnd.y -= endDim.height / 2;
-
-        // Gap for arrowhead
-        const ARROW_GAP = 5;
-        if (toEdge === 'right') newEnd.x += ARROW_GAP;
-        else if (toEdge === 'left') newEnd.x -= ARROW_GAP;
-        else if (toEdge === 'bottom') newEnd.y += ARROW_GAP;
-        else if (toEdge === 'top') newEnd.y -= ARROW_GAP;
-
-        pathPoints[lastIdx] = newEnd;
-    }
+    // 2. Adjust Start and End points (Legacy support if needed, but we used Projected points so we are good)
+    // The previous code had specific logic for startDim/endDim.
+    // If startDim > 0, calculateConnectorPath was shifting the start point.
+    // But we are now using the PASSED 'start' and 'end' which are usually edge points.
+    // If Dims are passed, usually 'start' is CENTER. 
+    // BUT in CloudDiagramRenderer, 'start' is getDistributedPoint (EDGE).
+    // So we assume Start/End are EDGE points.
 
     let pathSegments = [];
     for (let i = 0; i < pathPoints.length - 1; i++) {
@@ -179,7 +157,7 @@ export const calculateConnectorPath = (
 
 export const layoutDiagram = (architecture, systemName, { isMobile, isTablet }) => {
     const COMPONENT_WIDTH = isMobile ? 150 : (isTablet ? 180 : 220);
-    const COMPONENT_HEIGHT = isMobile ? 90 : 120;
+    const COMPONENT_HEIGHT = isMobile ? 110 : 130;
     const COMPONENT_GAP_X = isMobile ? 40 : (isTablet ? 60 : 80);
     const LAYER_HEIGHT = isMobile ? 200 : 250;
     const TITLE_SPACE = 50;
@@ -228,6 +206,16 @@ export const layoutDiagram = (architecture, systemName, { isMobile, isTablet }) 
         }
     });
 
+    // 0.2 Filter out empty layers
+    const originalLayerCount = architecture.layers.length;
+    architecture.layers = architecture.layers.filter(l => l.componentIds.length > 0);
+    const removedLayers = originalLayerCount - architecture.layers.length;
+
+    // Distribute some of the saved space to remaining layers (breathing room)
+    // 50% of saved space is redistributed
+    const heightBonus = removedLayers > 0 ? (removedLayers * 250 / architecture.layers.length) * 0.5 : 0;
+    const FINAL_LAYER_HEIGHT = LAYER_HEIGHT + heightBonus;
+
     // 1. Sort components in layers
     const layerSortedComponentIds = [];
     architecture.layers.forEach((layer, layerIdx) => {
@@ -262,7 +250,7 @@ export const layoutDiagram = (architecture, systemName, { isMobile, isTablet }) 
 
     const calculatedWidth = (maxComponentsInLayer * (COMPONENT_WIDTH + COMPONENT_GAP_X)) + (PADDING_SIDE * 2);
     const width = Math.max(isMobile ? 350 : 1200, calculatedWidth);
-    const height = PADDING_TOP + (architecture.layers.length * LAYER_HEIGHT) + 40;
+    const height = PADDING_TOP + (architecture.layers.length * FINAL_LAYER_HEIGHT) + 40;
 
     const components = architecture.components.map(comp => {
         const layerIndex = architecture.layers.findIndex(layer =>
@@ -283,7 +271,7 @@ export const layoutDiagram = (architecture, systemName, { isMobile, isTablet }) 
         return {
             ...comp,
             x: startX + indexInLayer * (COMPONENT_WIDTH + COMPONENT_GAP_X) + COMPONENT_WIDTH / 2,
-            y: PADDING_TOP + (layerIndex * LAYER_HEIGHT) + LAYER_LABEL_HEIGHT + (LAYER_HEIGHT - LAYER_LABEL_HEIGHT) / 2,
+            y: PADDING_TOP + (layerIndex * FINAL_LAYER_HEIGHT) + LAYER_LABEL_HEIGHT + (FINAL_LAYER_HEIGHT - LAYER_LABEL_HEIGHT) / 2,
             width: COMPONENT_WIDTH,
             height: COMPONENT_HEIGHT,
             layerIndex,
@@ -386,19 +374,48 @@ export const getDistributedPoint = (comp, edge, index, total) => {
     }
 
     if (edge === 'top' || edge === 'bottom') {
+        const EDGE_PADDING = 30;
         const availableWidth = comp.width - (2 * EDGE_PADDING);
-        const spacing = total > 1 ? availableWidth / (total - 1) : 0;
-        const startX = comp.x - comp.width / 2 + EDGE_PADDING;
-        const x = startX + (index * spacing);
-        const y = edge === 'top' ? comp.y - comp.height / 2 : comp.y + comp.height / 2;
-        return { x, y };
+        const PREFERRED_GAP = 40; // tighter clustering
+        
+        // Check if we can cluster centrally
+        const requiredSpan = total > 1 ? (total - 1) * PREFERRED_GAP : 0;
+        
+        if (requiredSpan <= availableWidth) {
+            // Cluster Centrally
+            const startX = comp.x - requiredSpan / 2;
+            const x = startX + (index * PREFERRED_GAP);
+            const y = edge === 'top' ? comp.y - comp.height / 2 : comp.y + comp.height / 2;
+            return { x, y };
+        } else {
+            // Spread to fit
+            const spacing = total > 1 ? availableWidth / (total - 1) : 0;
+            const startX = comp.x - comp.width / 2 + EDGE_PADDING;
+            const x = startX + (index * spacing);
+            const y = edge === 'top' ? comp.y - comp.height / 2 : comp.y + comp.height / 2;
+            return { x, y };
+        }
     } else {
+        const EDGE_PADDING = 30;
         const availableHeight = comp.height - (2 * EDGE_PADDING);
-        const spacing = total > 1 ? availableHeight / (total - 1) : 0;
-        const startY = comp.y - comp.height / 2 + EDGE_PADDING;
-        const y = startY + (index * spacing);
-        const x = edge === 'left' ? comp.x - comp.width / 2 : comp.x + comp.width / 2;
-        return { x, y };
+        const PREFERRED_GAP = 40;
+
+        const requiredSpan = total > 1 ? (total - 1) * PREFERRED_GAP : 0;
+
+        if (requiredSpan <= availableHeight) {
+             // Cluster Centrally
+             const startY = comp.y - requiredSpan / 2;
+             const y = startY + (index * PREFERRED_GAP);
+             const x = edge === 'left' ? comp.x - comp.width / 2 : comp.x + comp.width / 2;
+             return { x, y };
+        } else {
+            // Spread to fit
+            const spacing = total > 1 ? availableHeight / (total - 1) : 0;
+            const startY = comp.y - comp.height / 2 + EDGE_PADDING;
+            const y = startY + (index * spacing);
+            const x = edge === 'left' ? comp.x - comp.width / 2 : comp.x + comp.width / 2;
+            return { x, y };
+        }
     }
 };
 
@@ -414,7 +431,7 @@ const boxesOverlap = (a, b) => {
 export const labelCollides = (x, y, pathPoints, components, placedLabels, width, height, groups = []) => {
     const COMPONENT_BUFFER = 20;
     const ARROW_BUFFER = 35;
-    const LABEL_BUFFER = 6;
+    const LABEL_BUFFER = 15;
     const GROUP_BORDER_BUFFER = 15; // increased buffer for borders
 
     const hw = width / 2;
@@ -671,6 +688,47 @@ export const findClearLabelPosition = (pathPoints, segmentIndex, components, pla
         for (let step = 100; step <= 250; step += 30) {
             const cx = mx + dir.dx * step;
             const cy = my + dir.dy * step;
+
+            // Collision check with already placed labels (strict avoidance in fallback)
+            let collidesWithLabel = false;
+            const currentLabelBox = {
+                left: cx - hw,
+                right: cx + hw,
+                top: cy - hh,
+                bottom: cy + hh
+            };
+
+            for (const placed of placedLabels) {
+                // Use 15px buffer here too
+                if (boxesOverlap(currentLabelBox, {
+                    left: placed.left - 15,
+                    right: placed.right + 15,
+                    top: placed.top - 15,
+                    bottom: placed.bottom + 15
+                })) {
+                    collidesWithLabel = true;
+                    break;
+                }
+            }
+
+            if (collidesWithLabel) continue;
+
+            // Strict component collision check
+            let collidesWithComponent = false;
+            for (const comp of components) {
+                const compBox = {
+                    left: comp.x - comp.width / 2 - 10,
+                    right: comp.x + comp.width / 2 + 10,
+                    top: comp.y - comp.height / 2 - 10,
+                    bottom: comp.y + comp.height / 2 + 10
+                };
+                if (boxesOverlap(currentLabelBox, compBox)) {
+                    collidesWithComponent = true;
+                    break;
+                }
+            }
+            if (collidesWithComponent) continue;
+
             let minCompDist = Infinity;
             for (const comp of components) {
                 const d = Math.sqrt((cx - comp.x) ** 2 + (cy - comp.y) ** 2);
@@ -848,10 +906,10 @@ function clipOneSeg(seg, rect) {
 }
 
 export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTablet }) => {
-    const COMP_WIDTH = 100;
-    const COMP_HEIGHT = 100;   // taller to fit icon + label below
-    const GAP = 40;
-    const GROUP_PADDING = 60;  // space for group label + border
+    const COMP_WIDTH = 180;
+    const COMP_HEIGHT = 180;   // taller to fit icon + label + service + techs
+    const GAP = 80;
+    const GROUP_PADDING = 80;  // space for group label + border
     const TITLE_SPACE = 60;
 
     // 1. Build group tree
@@ -876,6 +934,44 @@ export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTable
         // Mark components in this group as not orphans
         if (group.componentIds) {
             group.componentIds.forEach(id => orphanComponentIds.delete(id));
+        }
+    });
+
+    // Helper to sort groups recursively based on priority terms
+    const sortGroupsRecursively = (groups) => {
+        if (!groups || groups.length === 0) return;
+
+        const priorityTerms = ['user', 'client', 'external', 'presentation'];
+        groups.sort((a, b) => {
+            const aName = (a.name || '').toLowerCase();
+            const bName = (b.name || '').toLowerCase();
+            const aType = (a.groupType || '').toLowerCase();
+            const bType = (b.groupType || '').toLowerCase();
+
+            const aPriority = priorityTerms.some(term => aName.includes(term) || aType.includes(term));
+            const bPriority = priorityTerms.some(term => bName.includes(term) || bType.includes(term));
+
+            if (aPriority && !bPriority) return -1;
+            if (!aPriority && bPriority) return 1;
+            return 0; // Keep original order if possible
+        });
+
+        // Recurse into children
+        groups.forEach(g => {
+            if (g.children && g.children.length > 0) {
+                sortGroupsRecursively(g.children);
+            }
+        });
+    };
+
+    // Apply recursive sorting starting from root
+    sortGroupsRecursively(rootGroups);
+
+    // 1b. Fix Orphan Detection: Check components that declare membership via groupId
+    // (This fixes the issue where components with valid groupId were incorrectly flagged as orphans)
+    architecture.components.forEach(c => {
+        if (c.groupId && groupMap.has(c.groupId)) {
+            orphanComponentIds.delete(c.id);
         }
     });
 
@@ -919,66 +1015,86 @@ export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTable
             if (tierComps.length === 0) return;
 
             // Sort tier components by connection topology (simple heuristic)
-            // This keeps connected components closer horizontally
-            tierComps.sort((a, b) => {
-                // heuristic: if A is connected to something already placed to the left?
-                // Simpler: just keep original order or alphabetical for stability
-                return a.name.localeCompare(b.name);
-            });
+            tierComps.sort((a, b) => a.name.localeCompare(b.name));
 
-            // Layout this tier row
-            let tierX = startX + GROUP_PADDING;
-            let tierMaxHeight = 0;
+            // Grid Layout Constants
+            const MAX_COLS = 4;
+            let currentTierHeight = 0;
+            let currentTierWidth = 0;
 
-            tierComps.forEach(comp => {
+            tierComps.forEach((comp, i) => {
                 const normalizedService = comp.cloudService ? normalizeServiceName(comp.cloudService) : '';
                 const cloudIconUrl = comp.cloudProvider ? getCloudIcon(comp.cloudProvider, normalizedService) : null;
 
+                const col = i % MAX_COLS;
+                const row = Math.floor(i / MAX_COLS);
+
+                const compX = startX + GROUP_PADDING + col * (COMP_WIDTH + GAP);
+                const compY = curY + row * (COMP_HEIGHT + GAP);
+
                 positionedComponents.set(comp.id, {
                     ...comp,
-                    x: tierX + COMP_WIDTH / 2,
-                    y: curY + COMP_HEIGHT / 2,
+                    x: compX + COMP_WIDTH / 2,
+                    y: compY + COMP_HEIGHT / 2,
                     width: COMP_WIDTH,
                     height: COMP_HEIGHT,
                     cloudIconUrl,
                     normalizedService,
                     cloudProvider: comp.cloudProvider || architecture.cloudProvider
                 });
-                tierX += COMP_WIDTH + GAP;
-                tierMaxHeight = Math.max(tierMaxHeight, COMP_HEIGHT);
+
+                currentTierWidth = Math.max(currentTierWidth, (col + 1) * (COMP_WIDTH + GAP));
+                currentTierHeight = (row + 1) * (COMP_HEIGHT + GAP);
             });
 
-            // Update group dimensions
-            maxWidth = Math.max(maxWidth, tierX - startX); // relative width
+            // Update group dimensions based on this tier
+            maxWidth = Math.max(maxWidth, currentTierWidth);
 
             // Move Y down for next tier
-            curY += tierMaxHeight + GAP;
-            maxRowHeight += tierMaxHeight + GAP; // Accumulate total height used
+            curY += currentTierHeight; // GAP is already included in row height calculation
+            maxRowHeight += currentTierHeight;
         });
 
-        // If no components, ensure at least some height? 
-        if (directComps.length === 0) {
-            // curY is untouched
-        }
-
-        // Layout child groups
+        // Layout child groups VERTICALLY (with conditional horizontal for small siblings)
         if (group.children && group.children.length > 0) {
-            // If we have components, add some gap before child groups
-            // if (directComps.length > 0) curY += GAP; 
-            // (Already added GAP after last tier)
-
-            // Layout child groups in a row (or maybe grid later)
             let childGroupsX = startX + GROUP_PADDING;
-            let maxChildHeight = 0;
+            let i = 0;
 
-            group.children.forEach(childGroup => {
-                const childBounds = layoutGroup(childGroup, childGroupsX, curY);
-                childGroupsX += childBounds.width + GAP;
-                maxWidth = Math.max(maxWidth, childGroupsX - startX);
-                maxChildHeight = Math.max(maxChildHeight, childBounds.height);
-            });
+            const getCompCount = (g) => architecture.components.filter(c => c.groupId === g.id || (g.componentIds && g.componentIds.includes(c.id))).length;
 
-            curY += maxChildHeight + GAP;
+            while (i < group.children.length) {
+                const current = group.children[i];
+                const next = group.children[i + 1];
+
+                const countCurrent = getCompCount(current);
+                const countNext = next ? getCompCount(next) : 999;
+
+                if ((countCurrent + countNext) <= 4) {
+                    // Place side-by-side
+                    const b1 = layoutGroup(current, childGroupsX, curY);
+                    const b2 = layoutGroup(next, childGroupsX + b1.width + GAP, curY);
+
+                    // Row height is max of both
+                    const rowHeight = Math.max(b1.height, b2.height);
+
+                    // Row width is sum of both + gap
+                    const rowWidth = b1.width + GAP + b2.width;
+
+                    curY += rowHeight + GAP;
+
+                    // Update maxWidth relative to parent group start
+                    // childGroupsX - startX = GROUP_PADDING
+                    maxWidth = Math.max(maxWidth, rowWidth + GROUP_PADDING);
+
+                    i += 2;
+                } else {
+                    // Standard vertical
+                    const b = layoutGroup(current, childGroupsX, curY);
+                    curY += b.height + GAP;
+                    maxWidth = Math.max(maxWidth, b.width + GROUP_PADDING);
+                    i++;
+                }
+            }
         }
 
         const myWidth = Math.max(maxWidth, 200) + GROUP_PADDING;
@@ -995,7 +1111,7 @@ export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTable
         return bounds;
     };
 
-    let x = 20;
+    let x = 60; // Increased from 20 to prevents left-side label cutoff
     let totalHeight = TITLE_SPACE;
 
     // Layout orphaned components first (if any)
@@ -1023,13 +1139,25 @@ export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTable
 
     const EXTRA_PADDING = 200; // Extra space for connectors/labels that might detour outside groups
 
+    // Filter out empty groups (no components AND no children)
+    const finalGroups = positionedGroups.filter(g => {
+        // A group is empty if:
+        // 1. It has no components assigned to it (via groupId or componentIds)
+        // 2. AND it has no children groups
+
+        const hasComponents = architecture.components.some(c => c.groupId === g.id || (g.componentIds && g.componentIds.includes(c.id)));
+        const hasChildren = g.children && g.children.length > 0;
+
+        return hasComponents || hasChildren;
+    });
+
     return {
         systemName,
         width: Math.max(x + 20 + EXTRA_PADDING, 1200),
         height: totalHeight + EXTRA_PADDING,
         components: Array.from(positionedComponents.values()),
         connections: architecture.connections,
-        groups: positionedGroups,
+        groups: finalGroups,
         cloudProvider: architecture.cloudProvider,
         isCloudMode: true
     };

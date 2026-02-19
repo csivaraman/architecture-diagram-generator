@@ -160,6 +160,9 @@ async function generateWithGemini(systemDescription, promptInstructions, systemP
 
     console.log(`[Gemini] Available models: ${geminiLimiter.getRecommendedModels().join(', ')}`);
 
+    let hasRetriedForTruncation = false;
+    let currentConfig = { ...GENERATION_CONFIG_GEMINI };
+
     for (let attempt = 0; attempt < 8; attempt++) {
         const available = await geminiLimiter.getKeyAndModel();
 
@@ -184,7 +187,7 @@ async function generateWithGemini(systemDescription, promptInstructions, systemP
 
         try {
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: modelName, generationConfig: GENERATION_CONFIG_GEMINI });
+            const model = genAI.getGenerativeModel({ model: modelName, generationConfig: currentConfig });
 
             let result;
             let retryCount = 0;
@@ -261,6 +264,21 @@ async function generateWithGemini(systemDescription, promptInstructions, systemP
                 console.warn(`[Gemini] 🔄 Overloaded. Trying next...`);
                 geminiLimiter.reportModelFailure(modelName, keyIndex);
                 continue;
+            }
+
+            // Global retry for truncated JSON (Unterminated string)
+            if (errorMsg.includes('Unterminated string in JSON')) {
+                if (!hasRetriedForTruncation) {
+                    console.warn(`[Gemini] ⚠️ JSON Truncated. Retrying with double maxOutputTokens (8192)...`);
+                    hasRetriedForTruncation = true;
+                    // Double the output tokens for the next attempt
+                    currentConfig = { ...GENERATION_CONFIG_GEMINI, maxOutputTokens: 8192 };
+                    // We don't increment attempt count essentially, to allow full retries with new config
+                    attempt--;
+                    continue;
+                } else {
+                    console.error(`[Gemini] ❌ JSON Truncated AGAIN despite higher limit.`);
+                }
             }
 
             console.error(`[Gemini] Unhandled Error: ${errorMsg}`);

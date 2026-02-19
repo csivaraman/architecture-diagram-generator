@@ -6,7 +6,7 @@ export const GROUP_STYLES = {
             borderWidth: 2,
             fillColor: 'rgba(0, 164, 166, 0.04)',
             labelColor: '#00A4A6',
-            iconUrl: '/cloud-icons/aws/groups/Region.svg',
+            iconUrl: '/cloud-icons/aws/Region_32.svg',
             borderRadius: 4
         },
         vpc: {
@@ -15,7 +15,7 @@ export const GROUP_STYLES = {
             borderWidth: 2,
             fillColor: 'rgba(140, 79, 255, 0.04)',
             labelColor: '#8C4FFF',
-            iconUrl: '/cloud-icons/aws/groups/VPC.svg',
+            iconUrl: '/cloud-icons/aws/Virtual-private-cloud-VPC_32.svg',
             borderRadius: 4
         },
         subnet: {
@@ -53,7 +53,7 @@ export const GROUP_STYLES = {
             borderWidth: 2,
             fillColor: 'rgba(0, 120, 212, 0.04)',
             labelColor: '#0078D4',
-            iconUrl: null,
+            iconUrl: '/cloud-icons/azure/10002-icon-service-Subscriptions.svg',
             borderRadius: 4
         },
         resource_group: {
@@ -62,7 +62,7 @@ export const GROUP_STYLES = {
             borderWidth: 1,
             fillColor: 'rgba(0, 120, 212, 0.06)',
             labelColor: '#0078D4',
-            iconUrl: null,
+            iconUrl: '/cloud-icons/azure/10007-icon-service-Resource-Groups.svg',
             borderRadius: 4
         },
         vnet: {
@@ -71,7 +71,7 @@ export const GROUP_STYLES = {
             borderWidth: 1,
             fillColor: 'rgba(0, 120, 212, 0.04)',
             labelColor: '#0078D4',
-            iconUrl: null,
+            iconUrl: '/cloud-icons/azure/10061-icon-service-Virtual-Networks.svg',
             borderRadius: 2
         }
     },
@@ -82,7 +82,7 @@ export const GROUP_STYLES = {
             borderWidth: 2,
             fillColor: 'rgba(66, 133, 244, 0.04)',
             labelColor: '#4285F4',
-            iconUrl: null,
+            iconUrl: '/cloud-icons/gcp/ManagementTools-512-color.svg',
             borderRadius: 4
         },
         vpc: {
@@ -91,7 +91,7 @@ export const GROUP_STYLES = {
             borderWidth: 1,
             fillColor: 'rgba(52, 168, 83, 0.04)',
             labelColor: '#34A853',
-            iconUrl: null,
+            iconUrl: '/cloud-icons/gcp/Networking-512-color-rgb.svg',
             borderRadius: 4
         },
         zone: {
@@ -100,7 +100,7 @@ export const GROUP_STYLES = {
             borderWidth: 1,
             fillColor: 'rgba(251, 188, 4, 0.04)',
             labelColor: '#888',
-            iconUrl: null,
+            iconUrl: '/cloud-icons/gcp/Compute-512-color.svg',
             borderRadius: 2
         }
     }
@@ -109,7 +109,7 @@ export const GROUP_STYLES = {
 export const getGroupStyle = (cloudProvider, groupType) => {
     return GROUP_STYLES[cloudProvider?.toLowerCase()]?.[groupType]
         || {
-            borderColor: '#999', borderStyle: 'dashed', borderWidth: 1,
+        borderColor: '#999', borderStyle: 'dashed', borderWidth: 1,
         fillColor: 'rgba(0,0,0,0.02)', labelColor: '#666', borderRadius: 4
     };
 };

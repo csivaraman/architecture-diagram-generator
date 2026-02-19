@@ -77,7 +77,7 @@ describe('App Component', () => {
                     systemName: "AWS System",
                     components: [
                         { id: "c1", name: "Lambda", type: "backend", cloudProvider: "aws", cloudService: "Lambda" },
-                        { id: "c2", name: "S3", type: "database", cloudProvider: "aws", cloudService: "S3" }
+                        { id: "c2", name: "EC2", type: "compute", cloudProvider: "aws", cloudService: "EC2" }
                     ],
                     connections: [],
                     layers: [{ name: "App", componentIds: ["c1", "c2"] }]
@@ -105,7 +105,55 @@ describe('App Component', () => {
         const images = document.querySelectorAll('image');
         const hrefs = Array.from(images).map(img => img.getAttribute('href'));
 
-        expect(hrefs.some(h => h.includes('aws-lambda'))).toBe(true);
-        expect(hrefs.some(h => h.includes('aws-s3'))).toBe(true);
+        // Check for presence of AWS specific icon paths (case sensitive matching actual files)
+        expect(hrefs.some(h => h.includes('AWS-Lambda'))).toBe(true);
+        // EC2 icon path contains "Amazon-EC2" (e.g. Arch_Amazon-EC2_64.svg)
+        expect(hrefs.some(h => h.includes('Amazon-EC2'))).toBe(true);
+    });
+
+    it('renders Azure icons correctly', async () => {
+        // Mock success response with Azure services
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                success: true,
+                diagram: {
+                    systemName: "Azure System",
+                    components: [
+                        { id: "c1", name: "SQL Edge", type: "database", cloudProvider: "azure", cloudService: "Azure SQL Edge" },
+                        { id: "c2", name: "Load Testing", type: "other", cloudProvider: "azure", cloudService: "Azure Load Testing" },
+                        { id: "c3", name: "AKS", type: "compute", cloudProvider: "azure", cloudService: "AKS" }
+                    ],
+                    connections: [],
+                    layers: [{ name: "App", componentIds: ["c1", "c2", "c3"] }]
+                }
+            })
+        });
+
+        const user = userEvent.setup();
+        render(<App />);
+
+        // Enter description
+        const textarea = screen.getByPlaceholderText(/Describe your system architecture/i);
+        await user.type(textarea, "Azure System");
+
+        // Click generate
+        const generateBtn = screen.getByText('Generate Diagram');
+        fireEvent.click(generateBtn);
+
+        // Wait for rendering
+        await waitFor(() => {
+            expect(screen.getByText("Azure System")).toBeInTheDocument();
+        });
+
+        // Verify icons
+        const images = document.querySelectorAll('image');
+        const hrefs = Array.from(images).map(img => img.getAttribute('href'));
+
+        // Check for presence of Azure specific icon paths
+        // Note: The actual paths depend on localIconMap resolution
+        expect(hrefs.some(h => h.includes('02750-icon-service-Azure-SQL-Edge'))).toBe(true);
+        expect(hrefs.some(h => h.includes('02944-icon-service-Azure-Load-Testing'))).toBe(true);
+        expect(hrefs.some(h => h.includes('10023-icon-service-Kubernetes-Services'))).toBe(true);
     });
 });
