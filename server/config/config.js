@@ -20,8 +20,6 @@ const getApiKeys = (names) => {
 
 export const geminiConfig = {
     keys: getApiKeys([
-        'GEMINI_API_KEY',
-        'GOOGLE_API_KEY',
         'GEMINI_API_KEY_1',
         'GEMINI_API_KEY_2',
         'GEMINI_API_KEY_3',
@@ -39,7 +37,6 @@ export const geminiConfig = {
 
 export const groqConfig = {
     keys: getApiKeys([
-        'GROQ_API_KEY',
         'GROQ_KEY_1',
         'GROQ_KEY_2',
         'GROQ_KEY_3'
