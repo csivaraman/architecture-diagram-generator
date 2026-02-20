@@ -1006,7 +1006,7 @@ export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTable
     const COMP_HEIGHT = 180;   // taller to fit icon + label + service + techs
     const GAP = 80;
     const GROUP_PADDING = 80;  // space for group label + border
-    const TITLE_SPACE = 60;
+    const TITLE_SPACE = 120;   // Generous title space for top positioning
 
     // 1. Build group tree
     // Initialize map with all groups
@@ -1247,9 +1247,30 @@ export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTable
         return hasComponents || hasChildren;
     });
 
+    // Center the content horizontally
+    const minX = Math.min(...finalGroups.map(g => g.x), ...Array.from(positionedComponents.values()).map(c => c.x - c.width / 2));
+    const maxX = Math.max(...finalGroups.map(g => g.x + g.width), ...Array.from(positionedComponents.values()).map(c => c.x + c.width / 2));
+    const contentWidth = maxX - minX;
+
+    const finalWidth = Math.max(contentWidth + EXTRA_PADDING * 2, 1200);
+
+    // Calculate how much to shift everything to perfectly center it in finalWidth
+    const currentCenter = minX + (contentWidth / 2);
+    const targetCenter = finalWidth / 2;
+    const offsetX = targetCenter - currentCenter;
+
+    if (offsetX !== 0) {
+        positionedComponents.forEach(comp => {
+            comp.x += offsetX;
+        });
+        finalGroups.forEach(group => {
+            group.x += offsetX;
+        });
+    }
+
     return {
         systemName,
-        width: Math.max(x + 20 + EXTRA_PADDING, 1200),
+        width: finalWidth,
         height: totalHeight + EXTRA_PADDING,
         components: Array.from(positionedComponents.values()),
         connections: architecture.connections,
