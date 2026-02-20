@@ -7,14 +7,14 @@ import {
     redistributeOvercrowdedEdges,
     getConnectorColor,
     layoutDiagram
-} from '../../utils/diagramLayout';
+} from '../../../server/utils/diagramLayout.js';
 import {
     calculateConnectorPath,
     findBestLabelPosition,
     findClearLabelPosition,
     measureLabelText,
     clipSegmentsAroundLabels
-} from '../../utils/connectorEngine';
+} from '../../../server/utils/connectorEngine.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

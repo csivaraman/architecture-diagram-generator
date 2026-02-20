@@ -1,5 +1,5 @@
-import { getCloudIcon, getCloudBadge, normalizeServiceName } from './cloudIcons';
-import { getGroupStyle } from './cloudGroupStyles';
+import { getCloudIcon, getCloudBadge, normalizeServiceName } from './cloudIcons.js';
+import { getGroupStyle } from './cloudGroupStyles.js';
 
 export const layoutCloudDiagram = (architecture, systemName, { isMobile, isTablet }) => {
     const COMP_WIDTH = 180;

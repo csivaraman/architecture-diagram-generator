@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import RateLimiter from '../../services/RateLimiter.js';
+import RateLimiter from '../../../server/services/RateLimiter.js';
 import fs from 'fs';
 import path from 'path';
 

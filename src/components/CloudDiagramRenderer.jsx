@@ -2,8 +2,8 @@ import React from 'react';
 import SvgDefs from './svg/SvgDefs';
 import ConnectionLayer from './svg/ConnectionLayer';
 import { useConnectionData } from '../hooks/useConnectionData';
-import { getGroupStyle } from '../utils/cloudGroupStyles';
-import { getCloudIcon, getCloudBadge, normalizeServiceName } from '../utils/cloudIcons';
+import { getGroupStyle } from "../../server/utils/cloudGroupStyles.js";
+import { getCloudIcon, getCloudBadge, normalizeServiceName } from "../../server/utils/cloudIcons.js";
 
 const CloudDiagramRenderer = ({ diagram, activeConnection, setActiveConnection }) => {
     if (!diagram || !diagram.groups) return null;

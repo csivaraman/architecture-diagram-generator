@@ -4,7 +4,7 @@ import { e2eTestPrompts } from '../fixtures/e2eTestPrompts.js';
 import cacheManager from './cache-manager.js';
 import { validators } from './validators.js';
 import reportGenerator from './report-generator.js';
-import { layoutDiagram } from '../../utils/diagramLayout.js';
+import { layoutDiagram } from '../../../server/utils/diagramLayout.js';
 
 // Shuffle and select random prompts
 const selectRandomPrompts = (prompts, count) => {

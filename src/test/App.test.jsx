@@ -75,9 +75,13 @@ describe('App Component', () => {
                 success: true,
                 diagram: {
                     systemName: "AWS System",
+                    width: 1000,
+                    height: 800,
+                    paddingTop: 100,
+                    layerHeight: 200,
                     components: [
-                        { id: "c1", name: "Lambda", type: "backend", cloudProvider: "aws", cloudService: "Lambda" },
-                        { id: "c2", name: "EC2", type: "compute", cloudProvider: "aws", cloudService: "EC2" }
+                        { id: "c1", name: "Lambda", type: "backend", cloudProvider: "aws", cloudService: "Lambda", x: 200, y: 200, width: 150, height: 100 },
+                        { id: "c2", name: "EC2", type: "compute", cloudProvider: "aws", cloudService: "EC2", x: 400, y: 200, width: 150, height: 100 }
                     ],
                     connections: [],
                     layers: [{ name: "App", componentIds: ["c1", "c2"] }]
@@ -119,10 +123,14 @@ describe('App Component', () => {
                 success: true,
                 diagram: {
                     systemName: "Azure System",
+                    width: 1000,
+                    height: 800,
+                    paddingTop: 100,
+                    layerHeight: 200,
                     components: [
-                        { id: "c1", name: "SQL Edge", type: "database", cloudProvider: "azure", cloudService: "Azure SQL Edge" },
-                        { id: "c2", name: "Load Testing", type: "other", cloudProvider: "azure", cloudService: "Azure Load Testing" },
-                        { id: "c3", name: "AKS", type: "compute", cloudProvider: "azure", cloudService: "AKS" }
+                        { id: "c1", name: "SQL Edge", type: "database", cloudProvider: "azure", cloudService: "Azure SQL Edge", x: 200, y: 200, width: 150, height: 100 },
+                        { id: "c2", name: "Load Testing", type: "other", cloudProvider: "azure", cloudService: "Azure Load Testing", x: 400, y: 200, width: 150, height: 100 },
+                        { id: "c3", name: "AKS", type: "compute", cloudProvider: "azure", cloudService: "AKS", x: 600, y: 200, width: 150, height: 100 }
                     ],
                     connections: [],
                     layers: [{ name: "App", componentIds: ["c1", "c2", "c3"] }]

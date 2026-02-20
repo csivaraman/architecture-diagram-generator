@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import RateLimiter from '../services/RateLimiter';
+import RateLimiter from '../../server/services/RateLimiter.js';
 
 // Mock fs
 const mockReadFileSync = vi.fn(() => '{}');

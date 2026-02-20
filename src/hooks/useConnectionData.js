@@ -3,13 +3,13 @@ import {
     redistributeOvercrowdedEdges,
     getDistributedPoint,
     getConnectorColor
-} from '../utils/diagramLayout';
+} from '../../server/utils/diagramLayout.js';
 import {
     calculateConnectorPath,
     measureLabelText,
     findBestLabelPosition,
     findClearLabelPosition
-} from '../utils/connectorEngine';
+} from '../../server/utils/connectorEngine.js';
 
 /**
  * Computes all connection path data for rendering.

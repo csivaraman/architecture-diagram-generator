@@ -1,4 +1,4 @@
-import { getCloudIcon, getCloudBadge, normalizeServiceName } from './cloudIcons';
+import { getCloudIcon, getCloudBadge, normalizeServiceName } from './cloudIcons.js';
 
 export const layoutDiagram = (architecture, systemName, { isMobile, isTablet }) => {
     const COMPONENT_WIDTH = isMobile ? 150 : (isTablet ? 180 : 220);

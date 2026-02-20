@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from 'vitest';
-import { getConnectorColor, getDistributedPoint } from '../../utils/diagramLayout';
-import { segmentPassesThroughComponent, pathIntersectsObstacles } from '../../utils/connectorEngine';
+import { getConnectorColor, getDistributedPoint } from '../../../server/utils/diagramLayout.js';
+import { segmentPassesThroughComponent, pathIntersectsObstacles } from '../../../server/utils/connectorEngine.js';
 
 describe('Connector Routing Rules', () => {
     describe('Color Coding', () => {

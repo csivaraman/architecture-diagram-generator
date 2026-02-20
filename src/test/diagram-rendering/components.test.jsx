@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from 'vitest';
-import { getComponentColor } from '../../utils/diagramLayout';
-import { getCloudIcon, getCloudBadge, normalizeServiceName } from '../../utils/cloudIcons';
+import { getComponentColor } from '../../../server/utils/diagramLayout.js';
+import { getCloudIcon, getCloudBadge, normalizeServiceName } from '../../../server/utils/cloudIcons.js';
 
 describe('Component Rendering Rules', () => {
 

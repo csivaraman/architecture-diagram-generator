@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { testPrompts } from '../fixtures/prompts';
-import { layoutDiagram } from '../../utils/diagramLayout';
+import { layoutDiagram } from '../../../server/utils/diagramLayout.js';
 import { mockDiagramResponse } from '../fixtures/mockResponse';
 
 describe('Prompt Fixtures Data Integrity', () => {

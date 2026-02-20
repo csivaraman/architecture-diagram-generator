@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { architectureTestCases } from '../../data/architectureTestCases';
-import { layoutDiagram } from '../../utils/diagramLayout';
+import { layoutDiagram } from '../../../server/utils/diagramLayout.js';
 import { mockDiagramResponse } from '../fixtures/mockResponse';
 
 describe('Architecture Test Cases Data Integrity', () => {

@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from 'vitest';
-import { layoutDiagram } from '../../utils/diagramLayout';
+import { layoutDiagram } from '../../../server/utils/diagramLayout.js';
 
 describe('Regression Tests', () => {
     describe('Orphan Component Healing', () => {

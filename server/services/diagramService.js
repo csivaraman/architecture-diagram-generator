@@ -1,14 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getCachedDiagram, setCachedDiagram } from './cache.js';
+import { getCachedDiagram, setCachedDiagram } from './cacheService.js';
 import RateLimiter from './RateLimiter.js';
-import dotenv from 'dotenv';
-
-// Try to load .env.local, but don't fail if it's missing (Vercel uses production env vars)
-try {
-    dotenv.config({ path: ".env.local" });
-} catch (e) {
-    // Standard environment variables will be used
-}
+import { geminiConfig, groqConfig } from '../config/config.js';
 
 const GENERATION_CONFIG_GEMINI = {
     temperature: 0.5,
@@ -25,13 +18,7 @@ console.log("---------------------------------------------------\n\n");
 /**
  * Initialize RateLimiters
  */
-const GEMINI_KEYS = [
-    process.env.VITE_GEMINI_API_KEY_1,
-    process.env.VITE_GEMINI_API_KEY_2,
-    process.env.VITE_GEMINI_API_KEY_3,
-    process.env.VITE_GEMINI_API_KEY_4,
-    process.env.VITE_GEMINI_API_KEY_5
-].filter(Boolean);
+const GEMINI_KEYS = geminiConfig.keys;
 
 if (GEMINI_KEYS.length === 0) {
     console.error('[Diagram Service] No Gemini API keys found');
@@ -39,21 +26,9 @@ if (GEMINI_KEYS.length === 0) {
 
 export const geminiLimiter = new RateLimiter(GEMINI_KEYS); // Uses default Gemini config
 
-const GROQ_KEYS = [
-    process.env.GROQ_KEY_1,
-    process.env.GROQ_KEY_2,
-    process.env.GROQ_KEY_3
-].filter(Boolean);
+const GROQ_KEYS = groqConfig.keys;
 
-const GROQ_CONFIG = {
-    priority: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
-    models: {
-        'llama-3.3-70b-versatile': { rpm: 30, tpm: 20000, rpd: 1000, quality: 'high' },
-        'llama-3.1-8b-instant': { rpm: 30, tpm: 20000, rpd: 14400, quality: 'medium' }
-    }
-};
-
-export const groqLimiter = new RateLimiter(GROQ_KEYS, GROQ_CONFIG, 'rate_limiter_stats_groq.json');
+export const groqLimiter = new RateLimiter(GROQ_KEYS, groqConfig, 'rate_limiter_stats_groq.json');
 
 /**
  * Standard system prompt for the architect

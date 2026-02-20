@@ -2,8 +2,8 @@ import React from 'react';
 import SvgDefs from './svg/SvgDefs';
 import ConnectionLayer from './svg/ConnectionLayer';
 import { useConnectionData } from '../hooks/useConnectionData';
-import { getComponentColor } from '../utils/diagramLayout';
-import { getCloudIcon, getCloudBadge, normalizeServiceName } from '../utils/cloudIcons';
+import { getComponentColor } from "../../server/utils/diagramLayout.js";
+import { getCloudIcon, getCloudBadge, normalizeServiceName } from "../../server/utils/cloudIcons.js";
 
 const LegacyDiagramRenderer = ({ diagram, zoom, activeConnection, setActiveConnection }) => {
     if (!diagram) return null;

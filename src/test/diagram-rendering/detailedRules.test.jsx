@@ -4,13 +4,13 @@ import {
     getConnectorColor,
     getDistributedPoint,
     getComponentColor
-} from '../../utils/diagramLayout';
+} from '../../../server/utils/diagramLayout.js';
 import {
     calculateConnectorPath,
     labelCollides,
     findClearLabelPosition
-} from '../../utils/connectorEngine';
-import { getCloudIcon, normalizeServiceName } from '../../utils/cloudIcons';
+} from '../../../server/utils/connectorEngine.js';
+import { getCloudIcon, normalizeServiceName } from '../../../server/utils/cloudIcons.js';
 
 describe('Detailed Rule Validation', () => {
 

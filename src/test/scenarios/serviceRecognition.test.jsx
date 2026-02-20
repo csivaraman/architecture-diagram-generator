@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from 'vitest';
-import { getCloudIcon, normalizeServiceName } from '../../utils/cloudIcons';
+import { getCloudIcon, normalizeServiceName } from '../../../server/utils/cloudIcons.js';
 
 describe('Service Recognition & Icon Rendering', () => {
 

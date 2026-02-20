@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from 'vitest';
-import { getGroupStyle } from '../utils/cloudGroupStyles';
+import { getGroupStyle } from '../../server/utils/cloudGroupStyles.js';
 
 describe('cloudGroupStyles', () => {
     describe('getGroupStyle', () => {
