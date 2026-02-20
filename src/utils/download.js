@@ -40,7 +40,7 @@ export const downloadSVG = async (diagram) => {
     let svgData = serializer.serializeToString(clonedSvg);
 
     if (!svgData.startsWith('<?xml')) {
-        svgData = '<?xml version="1.0" standalone="no"?>\\n' + svgData;
+        svgData = '<?xml version="1.0" standalone="no"?>\n' + svgData;
     }
 
     // Alternative Method: Data URI (Base64)
@@ -49,9 +49,9 @@ export const downloadSVG = async (diagram) => {
 
     // Sanitize filename
     const safeName = diagram.systemName
-        .replace(/[^\\w\\s-]/g, '')
+        .replace(/[^\w\s-]/g, '')
         .trim()
-        .replace(/\\s+/g, '-');
+        .replace(/\s+/g, '-');
 
     const link = document.createElement('a');
     link.href = dataUri;
