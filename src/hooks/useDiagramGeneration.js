@@ -44,7 +44,9 @@ export const useDiagramGeneration = () => {
             console.error('Error in useDiagramGeneration:', err);
 
             const errorMessage = err.message || '';
-            if (errorMessage.includes('Rate limit') || errorMessage.includes('rate-limited') || errorMessage.includes('429')) {
+            if (errorMessage.includes('No Gemini API keys configured')) {
+                setError("Application Setup Error: No Gemini API keys found in server configuration. Please ensure GEMINI_API_KEY is set in your Vercel/environment variables.");
+            } else if (errorMessage.includes('Rate limit') || errorMessage.includes('rate-limited') || errorMessage.includes('429')) {
                 setQuotaExceeded({
                     title: 'Quota Exceeded',
                     message: `The selected API (${provider}) is currently exhausted. Please select a different API provider or try again later.`

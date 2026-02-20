@@ -19,15 +19,19 @@ console.log("---------------------------------------------------\n\n");
  * Initialize RateLimiters
  */
 const GEMINI_KEYS = geminiConfig.keys;
+const GROQ_KEYS = groqConfig.keys;
+
+console.log(`[Diagram Service] Gemini Keys Detected: ${GEMINI_KEYS.length}`);
+console.log(`[Diagram Service] Groq Keys Detected: ${GROQ_KEYS.length}`);
 
 if (GEMINI_KEYS.length === 0) {
-    console.error('[Diagram Service] No Gemini API keys found');
+    console.warn('[Diagram Service] ⚠️ No Gemini API keys found. Gemini provider will be unavailable.');
+}
+if (GROQ_KEYS.length === 0) {
+    console.warn('[Diagram Service] ⚠️ No Groq API keys found. Groq provider will be unavailable.');
 }
 
 export const geminiLimiter = new RateLimiter(GEMINI_KEYS); // Uses default Gemini config
-
-const GROQ_KEYS = groqConfig.keys;
-
 export const groqLimiter = new RateLimiter(GROQ_KEYS, groqConfig, 'rate_limiter_stats_groq.json');
 
 /**
@@ -130,6 +134,10 @@ IMPORTANT GROUPING RULES:
  * wrappers for Gemini generation
  */
 async function generateWithGemini(systemDescription, promptInstructions, systemPrompt = DEFAULT_SYSTEM_PROMPT) {
+    if (GEMINI_KEYS.length === 0) {
+        throw new Error('No Gemini API keys configured. Please add GEMINI_API_KEY to your environment variables.');
+    }
+
     const prompt = `${systemPrompt} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
     let lastError;
 
