@@ -4,20 +4,9 @@ import { openInDrawioWithLocalStorage } from './utils/drawioIntegration';
 import { getCloudIcon, getCloudBadge, normalizeServiceName } from './utils/cloudIcons';
 import {
     getComponentColor,
-    redistributeOvercrowdedEdges,
-    layoutDiagram,
-    calculateConnectorPath,
-    getConnectorColor,
-    getDistributedPoint,
-    labelCollides,
-    findBestLabelPosition,
-    findClearLabelPosition,
-    segmentPassesThroughComponent,
-    pathIntersectsObstacles,
-    measureLabelText,
-    clipSegmentsAroundLabels,
-    layoutCloudDiagram
+    layoutDiagram
 } from './utils/diagramLayout';
+import { layoutCloudDiagram } from './utils/cloudLayout';
 import CloudDiagramRenderer from './components/CloudDiagramRenderer';
 import LegacyDiagramRenderer from './components/LegacyDiagramRenderer';
 import TestRunner from './test/TestRunner.jsx';

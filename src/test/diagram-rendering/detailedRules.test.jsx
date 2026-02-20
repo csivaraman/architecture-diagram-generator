@@ -1,13 +1,15 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-    calculateConnectorPath,
     getConnectorColor,
     getDistributedPoint,
-    labelCollides,
-    findClearLabelPosition,
     getComponentColor
 } from '../../utils/diagramLayout';
+import {
+    calculateConnectorPath,
+    labelCollides,
+    findClearLabelPosition
+} from '../../utils/connectorEngine';
 import { getCloudIcon, normalizeServiceName } from '../../utils/cloudIcons';
 
 describe('Detailed Rule Validation', () => {

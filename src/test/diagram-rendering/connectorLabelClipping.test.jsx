@@ -3,16 +3,18 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import {
-    calculateConnectorPath,
     getDistributedPoint,
     redistributeOvercrowdedEdges,
-    findBestLabelPosition,
-    findClearLabelPosition,
-    measureLabelText,
-    clipSegmentsAroundLabels,
     getConnectorColor,
     layoutDiagram
 } from '../../utils/diagramLayout';
+import {
+    calculateConnectorPath,
+    findBestLabelPosition,
+    findClearLabelPosition,
+    measureLabelText,
+    clipSegmentsAroundLabels
+} from '../../utils/connectorEngine';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

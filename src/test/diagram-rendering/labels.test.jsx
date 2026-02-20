@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from 'vitest';
-import { labelCollides, findBestLabelPosition } from '../../utils/diagramLayout';
+import { labelCollides, findBestLabelPosition } from '../../utils/connectorEngine';
 
 describe('Label Placement Rules', () => {
     describe('Collision Detection', () => {

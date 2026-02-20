@@ -1,6 +1,7 @@
 
 import { describe, it, expect } from 'vitest';
-import { redistributeOvercrowdedEdges, findClearLabelPosition } from '../../utils/diagramLayout';
+import { redistributeOvercrowdedEdges } from '../../utils/diagramLayout';
+import { findClearLabelPosition } from '../../utils/connectorEngine';
 
 describe('Layout Logic', () => {
 
