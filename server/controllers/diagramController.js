@@ -2,6 +2,7 @@ import { generateDiagram, geminiLimiter, groqLimiter } from '../services/diagram
 import { clearCache, deleteCacheEntry, getCacheStats } from '../services/cacheService.js';
 import { layoutDiagram } from '../utils/diagramLayout.js';
 import { layoutCloudDiagram } from '../utils/cloudLayout.js';
+import { normalizeDiagram } from '../services/diagramProcessor.js';
 
 export const getGeminiStatus = (req, res) => {
     try {
@@ -74,27 +75,29 @@ export const generateDiagramController = async (req, res) => {
     try {
         const result = await generateDiagram(systemDescription, instructions || '', provider, cloudProvider);
 
-        // --- Move rendering layout logic from frontend to backend ---
-        const architecture = result.diagram;
-        if (!architecture.components || !architecture.connections || !architecture.layers) {
-            throw new Error('Invalid architecture structure returned');
-        }
-
+        // Normalize the raw diagram from LLM
+        const architecture = normalizeDiagram(result.diagram);
         const generatedSystemName = architecture.systemName || 'System Architecture';
-        let visualDiagram;
 
-        const isCloudMode = cloudProvider === 'auto' || (cloudProvider !== 'none' && architecture.cloudProvider);
+        // Perform BOTH layouts to provide a consolidated response
+        const legacyLayout = layoutDiagram(JSON.parse(JSON.stringify(architecture)), generatedSystemName, { isMobile, isTablet });
+        const cloudLayout = layoutCloudDiagram(JSON.parse(JSON.stringify(architecture)), generatedSystemName, { isMobile, isTablet });
 
-        if (isCloudMode) {
-            visualDiagram = layoutCloudDiagram(architecture, generatedSystemName, { isMobile, isTablet });
-        } else {
-            visualDiagram = layoutDiagram(architecture, generatedSystemName, { isMobile, isTablet });
-        }
+        // Determine initial mode based on request
+        const isCloudMode = cloudProvider !== 'none';
 
-        // Return the fully laid out diagram
+        // Consolidated response including both layout versions
+        const consolidatedDiagram = {
+            ...(isCloudMode ? cloudLayout : legacyLayout), // Top level is the requested layout
+            legacyVersion: legacyLayout,
+            cloudVersion: cloudLayout,
+            isCloudMode: isCloudMode,
+            raw: architecture
+        };
+
         res.status(200).json({
             ...result,
-            diagram: visualDiagram
+            diagram: consolidatedDiagram
         });
     } catch (error) {
         console.error('[Generate Diagram Error]', error);

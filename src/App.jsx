@@ -11,7 +11,7 @@ import TestRunner from './test/TestRunner.jsx';
 const ArchitectureDiagramGenerator = () => {
     const [description, setDescription] = useState('');
     const [provider, setProvider] = useState('gemini');
-    const [cloudProvider, setCloudProvider] = useState('none');
+    const [viewMode, setViewMode] = useState('default');
     const [zoom, setZoom] = useState(1);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
@@ -42,7 +42,7 @@ const ArchitectureDiagramGenerator = () => {
             setError('Please provide a system description');
             return;
         }
-        generateDiagram(descToUse, provider, cloudProvider, isMobile, isTablet);
+        generateDiagram(descToUse, provider, 'auto', isMobile, isTablet);
     };
 
     return (
@@ -122,8 +122,6 @@ const ArchitectureDiagramGenerator = () => {
                         loading={loading}
                         provider={provider}
                         setProvider={setProvider}
-                        cloudProvider={cloudProvider}
-                        setCloudProvider={setCloudProvider}
                         onGenerate={() => handleGenerate(description)}
                     />
 
@@ -136,32 +134,43 @@ const ArchitectureDiagramGenerator = () => {
                 </div>
 
                 {/* Diagram Display Container */}
-                {diagram && (
-                    <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1rem' : '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-                        <DiagramControls diagram={diagram} zoom={zoom} setZoom={setZoom} />
+                {diagram && (() => {
+                    const isCloudModeView = viewMode === 'cloud';
+                    const activeDiagram = isCloudModeView ? (diagram.cloudVersion || diagram) : (diagram.legacyVersion || diagram);
 
-                        <div id="architecture-svg-container" style={{ overflow: 'auto', background: diagram.isCloudMode ? '#fff' : '#f9fafb', borderRadius: '12px', padding: '2rem', minHeight: '600px' }}>
-                            {diagram.isCloudMode ? (
-                                <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.2s' }}>
-                                    <CloudDiagramRenderer
-                                        diagram={diagram}
+                    return (
+                        <div style={{ background: 'white', borderRadius: '20px', padding: isMobile ? '1rem' : '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+                            <DiagramControls
+                                diagram={activeDiagram}
+                                zoom={zoom}
+                                setZoom={setZoom}
+                                viewMode={viewMode}
+                                setViewMode={setViewMode}
+                            />
+
+                            <div id="architecture-svg-container" style={{ overflow: 'auto', background: isCloudModeView ? '#fff' : '#f9fafb', borderRadius: '12px', padding: '2rem', minHeight: '600px' }}>
+                                {isCloudModeView ? (
+                                    <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.2s' }}>
+                                        <CloudDiagramRenderer
+                                            diagram={activeDiagram}
+                                            activeConnection={activeConnection}
+                                            setActiveConnection={setActiveConnection}
+                                        />
+                                    </div>
+                                ) : (
+                                    <LegacyDiagramRenderer
+                                        diagram={activeDiagram}
+                                        zoom={zoom}
                                         activeConnection={activeConnection}
                                         setActiveConnection={setActiveConnection}
                                     />
-                                </div>
-                            ) : (
-                                <LegacyDiagramRenderer
-                                    diagram={diagram}
-                                    zoom={zoom}
-                                    activeConnection={activeConnection}
-                                    setActiveConnection={setActiveConnection}
-                                />
-                            )}
-                        </div>
+                                )}
+                            </div>
 
-                        <ComponentLegend />
-                    </div>
-                )}
+                            <ComponentLegend />
+                        </div>
+                    );
+                })()}
 
                 {/* Footer Note */}
                 <div style={{ marginTop: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', paddingBottom: '2rem' }}>

@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getCachedDiagram, setCachedDiagram } from './cacheService.js';
 import RateLimiter from './RateLimiter.js';
 import { geminiConfig, groqConfig } from '../config/config.js';
+import { UNIFIED_SYSTEM_PROMPT } from '../config/constants.js';
 
 const GENERATION_CONFIG_GEMINI = {
     temperature: 0.5,
@@ -12,7 +13,7 @@ const GENERATION_CONFIG_GEMINI = {
 };
 
 console.log("\n\n---------------------------------------------------");
-console.log("   🚀 DIAGRAM SERVICE LOADED (UPDATED LOGGING)   ");
+console.log("   🚀 DIAGRAM SERVICE LOADED (UNIFIED REFAC)     ");
 console.log("---------------------------------------------------\n\n");
 
 /**
@@ -35,110 +36,14 @@ export const geminiLimiter = new RateLimiter(GEMINI_KEYS); // Uses default Gemin
 export const groqLimiter = new RateLimiter(GROQ_KEYS, groqConfig, 'rate_limiter_stats_groq.json');
 
 /**
- * Standard system prompt for the architect
- */
-const DEFAULT_SYSTEM_PROMPT = `
-You are an expert software architect.Generate a technical architecture diagram in JSON format for the given description.
-
-Your response must have this exact structure:
-
-{
-    "systemName": "A short, descriptive title",
-        "components": [
-            {
-                "id": "unique-id",
-                "name": "Component Name",
-                "type": "user|frontend|backend|database|cache|queue|api|service|external",
-                "description": "Brief description",
-                "technologies": ["tech1", "tech2"]
-            }
-        ],
-            "connections": [
-                {
-                    "from": "component-id",
-                    "to": "component-id",
-                    "label": "Protocol",
-                    "type": "sync|async|bidirectional"
-                }
-            ],
-                "layers": [
-                    {
-                        "name": "Client|Presentation|Application|Data|Infrastructure",
-                        "componentIds": ["id1", "id2"]
-                    }
-                ]
-} `;
-
-const CLOUD_SYSTEM_PROMPT = `
-You are an expert cloud architect. Generate a technical architecture diagram in JSON format.
-
-Your response must follow this exact structure:
-
-{
-  "systemName": "Short descriptive title",
-  "cloudProvider": "aws" | "azure" | "gcp" | "multi",
-  "components": [
-    {
-      "id": "unique-id",
-      "name": "Component Name",
-      "type": "user|frontend|backend|database|cache|queue|api|service|external",
-      "description": "Brief description",
-      "technologies": ["tech1"],
-      "cloudProvider": "aws",
-      "cloudService": "Lambda",      // exact service name
-      "groupId": "group-vpc-1"       // which boundary group this belongs to
-    }
-  ],
-  "connections": [
-    {
-      "from": "component-id",
-      "to": "component-id",
-      "label": "HTTPS",
-      "type": "sync|async|bidirectional"
-    }
-  ],
-  "layers": [
-    { "name": "Client|Application|Data", "componentIds": ["id1"] }
-  ],
-  "groups": [
-    {
-      "id": "group-region-1",
-      "name": "AWS Region (us-east-1)",
-      "groupType": "region",          // region | vpc | subnet | az | security_group | resource_group | project
-      "cloudProvider": "aws",
-      "parentGroupId": null,          // null = top level, or ID of parent group
-      "componentIds": ["id1", "id2"], // components directly in this group
-      "childGroupIds": ["group-vpc-1"]
-    },
-    {
-      "id": "group-vpc-1",
-      "name": "Amazon VPC",
-      "groupType": "vpc",
-      "cloudProvider": "aws",
-      "parentGroupId": "group-region-1",
-      "componentIds": ["id3", "id4"],
-      "childGroupIds": []
-    }
-  ]
-}
-
-IMPORTANT GROUPING RULES:
-- For AWS: use groupTypes: region, vpc, subnet, az, security_group
-- For Azure: use groupTypes: subscription, resource_group, vnet, subnet
-- For GCP: use groupTypes: project, vpc, subnet, region, zone
-- Every component must be assigned to exactly one group via groupId
-- Groups can be nested via parentGroupId/childGroupIds
-`;
-
-/**
  * wrappers for Gemini generation
  */
-async function generateWithGemini(systemDescription, promptInstructions, systemPrompt = DEFAULT_SYSTEM_PROMPT) {
+async function generateWithGemini(systemDescription, promptInstructions) {
     if (GEMINI_KEYS.length === 0) {
         throw new Error('No Gemini API keys configured. Please add GEMINI_API_KEY to your environment variables.');
     }
 
-    const prompt = `${systemPrompt} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
+    const prompt = `${UNIFIED_SYSTEM_PROMPT} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
     let lastError;
 
     console.log(`[Gemini] Available models: ${geminiLimiter.getRecommendedModels().join(', ')}`);
@@ -184,8 +89,7 @@ async function generateWithGemini(systemDescription, promptInstructions, systemP
                     console.log(
                         `[Gemini] ✅ SUCCESS in ${latency}ms | ` +
                         `Model: ${modelName} | ` +
-                        `Attempt: ${attempt + 1} | ` +
-                        `Quality: ${geminiLimiter.models[modelName].quality}`
+                        `Attempt: ${attempt + 1}`
                     );
                     break;
                 } catch (reqErr) {
@@ -223,7 +127,6 @@ async function generateWithGemini(systemDescription, promptInstructions, systemP
         } catch (err) {
             lastError = err;
             const errorMsg = (err.message || '') + (err.toString() || '');
-            const keyId = keyIndex + 1;
 
             if (errorMsg.includes('timeout')) {
                 console.warn(`[Gemini] ⏱️ Timeout for ${modelName}`);
@@ -252,58 +155,40 @@ async function generateWithGemini(systemDescription, promptInstructions, systemP
             // Global retry for truncated JSON (Unterminated string)
             if (errorMsg.includes('Unterminated string in JSON')) {
                 if (!hasRetriedForTruncation) {
-                    console.warn(`[Gemini] ⚠️ JSON Truncated. Retrying with double maxOutputTokens (8192)...`);
+                    console.warn(`[Gemini] ⚠️ JSON Truncated. Retrying with higher limit...`);
                     hasRetriedForTruncation = true;
-                    // Double the output tokens for the next attempt
                     currentConfig = { ...GENERATION_CONFIG_GEMINI, maxOutputTokens: 8192 };
-                    // We don't increment attempt count essentially, to allow full retries with new config
                     attempt--;
                     continue;
-                } else {
-                    console.error(`[Gemini] ❌ JSON Truncated AGAIN despite higher limit.`);
                 }
             }
 
-            console.error(`[Gemini] Unhandled Error: ${errorMsg}`);
+            console.error(`[Gemini] Error: ${errorMsg}`);
         }
     }
-    throw new Error(`Gemini generation failed after multiple attempts. Last error: ${lastError?.message}`);
+    throw new Error(`Gemini generation failed. Last error: ${lastError?.message}`);
 }
 
 /**
  * wrapper for Groq generation
  */
-async function generateWithGroq(systemDescription, promptInstructions, systemPrompt = DEFAULT_SYSTEM_PROMPT) {
+async function generateWithGroq(systemDescription, promptInstructions) {
     if (GROQ_KEYS.length === 0) {
         throw new Error('No Groq API keys configured.');
     }
 
-    const prompt = `${systemPrompt} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
+    const prompt = `${UNIFIED_SYSTEM_PROMPT} \n\n${promptInstructions} \n\nDescription: ${systemDescription} \n\nGenerate the architecture JSON.`;
     let lastError;
-
-    console.log(`[Groq] Available models: ${groqLimiter.getRecommendedModels().join(', ')}`);
 
     for (let attempt = 0; attempt < 8; attempt++) {
         const available = await groqLimiter.getKeyAndModel();
 
         if (!available) {
-            throw new Error('All Groq API keys and models are currently rate-limited.');
+            throw new Error('All Groq API keys are rate-limited.');
         }
 
         const { keyIndex, model: modelName } = available;
         const apiKey = GROQ_KEYS[keyIndex];
-        const maskedKey = `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)} `;
-
-        const modelStats = groqLimiter.getStats()[keyIndex][modelName];
-        const MAX_ATTEMPTS = 8;
-
-        console.log(
-            `[Groq] 🚀 Attempt ${attempt + 1}/${MAX_ATTEMPTS} | ` +
-            `Key #${keyIndex + 1} (${maskedKey}) | ` +
-            `Model: ${modelName} | ` +
-            `Usage: ${modelStats.requestCount}/${Math.floor(groqLimiter.models[modelName].rpm * 0.8)} RPM, ` +
-            `${modelStats.dailyCount}/${Math.floor(groqLimiter.models[modelName].rpd * 0.8)} RPD`
-        );
 
         try {
             const startTime = Date.now();
@@ -316,62 +201,33 @@ async function generateWithGroq(systemDescription, promptInstructions, systemPro
                 body: JSON.stringify({
                     model: modelName,
                     messages: [
-                        { role: 'system', content: systemPrompt },
+                        { role: 'system', content: UNIFIED_SYSTEM_PROMPT },
                         { role: 'user', content: `${promptInstructions}\n\nDescription: ${systemDescription}` }
                     ],
                     response_format: { type: 'json_object' },
                     temperature: 0.5,
-                    max_tokens: 4096,
-                    top_p: 0.95
+                    max_tokens: 4096
                 })
             });
             const latency = Date.now() - startTime;
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMsg = errorData.error?.message || response.statusText;
-
                 if (response.status === 429) {
-                    console.warn(`[Groq Service] Key #${keyIndex + 1} | Model: ${modelName} hit rate limit (429).`);
                     groqLimiter.reportQuotaExceeded(keyIndex, modelName);
                     continue;
                 }
-
-                if (response.status >= 500) {
-                    console.warn(`[Groq Service] Server error ${response.status}. Retrying...`);
-                    // Retry once immediately for 500s? Or let the loop handle it via continue?
-                    // Loop handles it by trying next key/model, which is safer
-                    continue;
-                }
-
-                throw new Error(`Groq API Error ${response.status}: ${errorMsg}`);
+                throw new Error(`Groq API Error ${response.status}`);
             }
 
             const data = await response.json();
             const content = data.choices[0].message.content;
+            let diagramData = JSON.parse(content);
 
-            let diagramData;
-            try {
-                diagramData = JSON.parse(content);
-            } catch (e) {
-                // Sometimes local models wrap in ```json
-                const cleaned = content.replace(/```json\n ?/g, '').replace(/```\n?/g, '').trim();
-                diagramData = JSON.parse(cleaned);
-            }
-
-            // If "diagram" wrapper is present in JSON (sometimes models do this despite prompt), unwrap it
-            if (diagramData.diagram && !diagramData.components) {
-                diagramData = diagramData.diagram;
-            }
+            if (diagramData.diagram && !diagramData.components) diagramData = diagramData.diagram;
 
             groqLimiter.recordRequest(keyIndex, modelName);
 
-            console.log(
-                `[Groq] ✅ SUCCESS in ${latency}ms | ` +
-                `Model: ${modelName} | ` +
-                `Attempt: ${attempt + 1} | ` +
-                `Quality: ${groqLimiter.models[modelName].quality}`
-            );
+            console.log(`[Groq] ✅ SUCCESS in ${latency}ms | Model: ${modelName}`);
 
             return {
                 diagram: diagramData,
@@ -380,67 +236,22 @@ async function generateWithGroq(systemDescription, promptInstructions, systemPro
 
         } catch (err) {
             lastError = err;
-            const errorMsg = (err.message || '') + (err.toString() || '');
-
-            if (errorMsg.includes('timeout')) {
-                console.warn(`[Groq] ⏱️ Timeout for ${modelName}`);
-                groqLimiter.reportModelFailure(modelName, keyIndex);
-                continue;
-            }
-
-            if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('Rate limit')) {
-                console.warn(`[Groq] 🚫 Rate limit hit for ${modelName}`);
-                groqLimiter.reportQuotaExceeded(keyIndex, modelName);
-                continue;
-            }
-
-            if (errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('not supported')) {
-                console.warn(`[Groq] ❌ Model ${modelName} not available (404)`);
-                groqLimiter.markModelUnavailable(modelName);
-                continue;
-            }
-
-            if (errorMsg.includes('503') || errorMsg.includes('overloaded') || errorMsg.includes('Service Unavailable')) {
-                console.warn(`[Groq] 🔄 Overloaded. Trying next...`);
-                groqLimiter.reportModelFailure(modelName, keyIndex);
-                continue;
-            }
-
-            // For fetch/network errors, try next
-            if (errorMsg.includes('fetch') || errorMsg.includes('network')) {
-                console.warn(`[Groq] 🌐 Network error. Retrying...`);
-                continue;
-            }
-
-            console.error(`[Groq Service] Unhandled Error:`, err);
             continue;
         }
     }
-    throw new Error(`Groq generation failed after multiple attempts. Last error: ${lastError?.message}`);
+    throw new Error(`Groq generation failed. Last error: ${lastError?.message}`);
 }
 
 /**
  * Generates an architecture diagram for the given description
- * @param {string} systemDescription 
- * @param {string} promptInstructions Optional custom instructions
- * @param {string} provider 'gemini' | 'groq'
- * @returns {Promise<object>}
- */
-/**
- * Generates an architecture diagram for the given description
- * @param {string} systemDescription 
- * @param {string} promptInstructions Optional custom instructions
- * @param {string} provider 'gemini' | 'groq'
- * @param {string} cloudProvider 'auto' | 'aws' | 'azure' | 'gcp' | 'none'
- * @returns {Promise<object>}
  */
 export const generateDiagram = async (systemDescription, promptInstructions = '', provider = 'gemini', cloudProvider = 'auto') => {
     if (!systemDescription) {
         throw new Error('System description is required');
     }
 
-    // cache key includes provider to avoid mixing different model qualities
-    const cacheKey = `${provider}:${cloudProvider}:${systemDescription}`;
+    // Updated cache key: provider:systemDescription (cloudProvider is handled by processor)
+    const cacheKey = `provider:${provider}:${systemDescription}`;
     const cached = getCachedDiagram(cacheKey);
 
     if (cached) {
@@ -453,33 +264,27 @@ export const generateDiagram = async (systemDescription, promptInstructions = ''
         };
     }
 
-    // ✅ OPTIMIZED: Concise cloud instructions
+    // Cloud-specific instructions to augment the unified prompt
     const cloudInstructions = {
-        'auto': `Detect cloud provider. 
-        'aws': For AWS components, add: "cloudProvider": "aws", "cloudService": "<service>" (Lambda, S3, DynamoDB, etc.).
-        'azure': For Azure components, add: "cloudProvider": "azure", "cloudService": "<service>" (Functions, Cosmos DB, etc.).
-        'gcp': For GCP components, add: "cloudProvider": "gcp", "cloudService": "<service>" (Cloud Run, BigQuery, etc.).
-        IMPORTANT: You MUST organize components into hierarchical groups (e.g., Region > VPC > Subnet) using the 'groups' array and 'groupId' on components.`,
-        'none': ''
+        'auto': 'Detect cloud provider. Map components to cloud services. Organize into hierarchical groups.',
+        'aws': 'Force AWS provider. Map components to AWS services. Organize into Region > VPC > Subnet groups.',
+        'azure': 'Force Azure provider. Map components to Azure services. Organize into Subscription > Resource Group > VNet groups.',
+        'gcp': 'Force GCP provider. Map components to GCP services. Organize into Project > VPC > Subnet groups.',
+        'none': 'Generate a general architecture, but still identify likely cloud services (e.g. RDS for DB) for metadata.'
     };
 
-    let selectedInstructions = cloudInstructions[cloudProvider] || cloudInstructions['auto'];
-    if (cloudProvider === 'none') selectedInstructions = "";
-
-
+    const selectedInstructions = cloudInstructions[cloudProvider] || cloudInstructions['auto'];
     const fullInstructions = `${promptInstructions}\n\n${selectedInstructions}`;
-
-    const systemPrompt = (cloudProvider !== 'none') ? CLOUD_SYSTEM_PROMPT : DEFAULT_SYSTEM_PROMPT;
 
     let result;
     if (provider === 'groq') {
-        result = await generateWithGroq(systemDescription, fullInstructions, systemPrompt);
+        result = await generateWithGroq(systemDescription, fullInstructions);
     } else {
-        result = await generateWithGemini(systemDescription, fullInstructions, systemPrompt);
+        result = await generateWithGemini(systemDescription, fullInstructions);
     }
 
+    // Store the raw unified response in cache
     setCachedDiagram(cacheKey, result.diagram);
-    // Also set old key format for backward compatibility if needed? No, better to segregate.
 
     return {
         success: true,

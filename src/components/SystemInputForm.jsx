@@ -8,8 +8,6 @@ const SystemInputForm = ({
     loading,
     provider,
     setProvider,
-    cloudProvider,
-    setCloudProvider,
     onGenerate
 }) => {
     const handleLoadExample = (e) => {
@@ -80,21 +78,6 @@ const SystemInputForm = ({
                 >
                     <option value="gemini">Google Gemini</option>
                     <option value="groq">Groq Llama</option>
-                </select>
-
-                <select
-                    value={cloudProvider}
-                    onChange={(e) => setCloudProvider(e.target.value)}
-                    disabled={loading}
-                    style={{
-                        padding: '1rem 1.5rem', fontSize: '1rem', fontWeight: 600, color: '#4b5563',
-                        background: 'white', border: '2px solid #e5e7eb', borderRadius: '12px',
-                        cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s', appearance: 'none',
-                        textAlign: 'center', minWidth: '200px'
-                    }}
-                >
-                    <option value="none">Default</option>
-                    <option value="auto">Cloud</option>
                 </select>
 
                 <select
